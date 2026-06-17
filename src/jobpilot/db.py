@@ -70,9 +70,16 @@ def utcnow() -> str:
 def connect(path: Optional[Path | str] = None) -> sqlite3.Connection:
     """Open the DB, apply pending migrations, return the connection."""
     target = Path(path) if path is not None else config.db_path()
-    conn = sqlite3.connect(target)
+    conn = sqlite3.connect(target, timeout=30)
     conn.row_factory = sqlite3.Row
+    # busy_timeout first so every later statement waits out a lock instead of
+    # erroring; WAL lets the batch worker pool read while one writer commits.
+    conn.execute("PRAGMA busy_timeout = 30000")
     conn.execute("PRAGMA foreign_keys = ON")
+    try:
+        conn.execute("PRAGMA journal_mode = WAL")
+    except sqlite3.OperationalError:
+        pass  # another connection is mid-write; WAL is persistent once set anyway
     _migrate(conn)
     return conn
 

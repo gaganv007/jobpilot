@@ -35,6 +35,26 @@ GATE_MIN = 3
 CAP_WHEN_GATE_FAILS = 2.0
 
 
+def active_weights() -> dict[str, float]:
+    """Default weights, overlaid with any human-approved overrides from
+    weights.json in JOBPILOT_HOME (written via calibration, never silently)."""
+    weights = dict(WEIGHTS)
+    try:
+        import json
+
+        from . import config
+
+        p = config.home_dir() / "weights.json"
+        if p.exists():
+            override = json.loads(p.read_text(encoding="utf-8"))
+            for k, v in override.items():
+                if k in weights and isinstance(v, (int, float)) and v >= 0:
+                    weights[k] = float(v)
+    except Exception:
+        pass
+    return weights
+
+
 def validate_dims(dims: dict[str, int]) -> None:
     missing = [d for d in DIMENSIONS if d not in dims]
     if missing:
@@ -52,8 +72,9 @@ def compute_overall(dims: dict[str, int]) -> tuple[float, bool]:
     False and overall is capped at CAP_WHEN_GATE_FAILS.
     """
     validate_dims(dims)
-    weighted = sum(dims[d] * WEIGHTS[d] for d in DIMENSIONS)
-    total_w = sum(WEIGHTS.values())
+    weights = active_weights()
+    weighted = sum(dims[d] * weights[d] for d in DIMENSIONS)
+    total_w = sum(weights.values())
     mean = weighted / total_w
 
     gate_passed = all(dims[g] >= GATE_MIN for g in GATES)

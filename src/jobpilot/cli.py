@@ -330,10 +330,94 @@ def packet(job_id: int = typer.Argument(..., help="Job id to assemble a packet f
 
 
 @app.command()
-def batch(urls_file: str = typer.Argument(..., help="Text file of URLs, one per line.")) -> None:
-    """Add + score many URLs with a resumable worker pool. Stops at tailored. (Phase 5)"""
-    console.print(f"[yellow]batch[/]: {_NOT_YET}")
-    raise typer.Exit(code=1)
+def batch(
+    urls_file: str = typer.Argument(..., help="Text file of URLs, one per line."),
+    workers: int = typer.Option(4, "--workers", help="Worker pool size."),
+    delay: float = typer.Option(None, "--delay", help="Polite per-fetch delay (seconds)."),
+) -> None:
+    """Add + score many URLs with a resumable worker pool (lock files per URL).
+
+    It STOPS at scoring and never applies. Re-run it to resume after a crash.
+    """
+    from pathlib import Path
+
+    from . import batch as batch_mod
+
+    if not Path(urls_file).exists():
+        console.print(f"[red]No such file:[/] {urls_file}")
+        raise typer.Exit(code=1)
+    urls = batch_mod.read_urls(urls_file)
+    if not urls:
+        console.print("No URLs found in file.")
+        return
+
+    console.print(f"Processing {len(urls)} URL(s) with {workers} worker(s). "
+                  f"[dim]Fetches are serialized for politeness. Never applies.[/]")
+    results = batch_mod.run_batch(urls, workers=workers, delay=delay)
+
+    from rich.table import Table
+
+    summary = Table(title="Batch results")
+    summary.add_column("URL")
+    summary.add_column("Outcome")
+    summary.add_column("Job", justify="right")
+    summary.add_column("Score", justify="right")
+    for r in results:
+        score_cell = "—"
+        if r.overall is not None:
+            score_cell = f"{r.overall:.1f}{'' if r.gate_passed else ' ✗'}"
+        summary.add_row(r.url[:50], r.status, str(r.job_id or "—"), score_cell)
+    console.print(summary)
+
+    conn = db.connect()
+    sl = batch_mod.shortlist(conn, limit=10)
+    if sl:
+        ranked = Table(title="Ranked shortlist (gate-passing first) — you decide what to pursue")
+        ranked.add_column("#", justify="right")
+        ranked.add_column("Score", justify="right")
+        ranked.add_column("Gate")
+        ranked.add_column("Title")
+        ranked.add_column("Company")
+        for row in sl:
+            ranked.add_row(
+                str(row["id"]), f"{row['overall']:.2f}",
+                "PASS" if row["gate_passed"] else "FAIL",
+                (row["title"] or "(untitled)")[:40], (row["company"] or "—")[:24],
+            )
+        console.print(ranked)
+    console.print("[dim]Next: jobpilot tailor <id>, then jobpilot packet <id>. JobPilot never applies for you.[/]")
+
+
+@app.command()
+def gaps() -> None:
+    """Aggregate skill gaps across scored jobs; name the best skill to learn next."""
+    from . import gaps as gaps_mod
+
+    conn = db.connect()
+    from rich.markdown import Markdown
+
+    console.print(Markdown(gaps_mod.build_gap_report(conn)))
+
+
+@app.command()
+def calibrate() -> None:
+    """Report whether my scoring predicts real outcomes; suggest weight tweaks."""
+    from . import calibration
+
+    conn = db.connect()
+    rep = calibration.report(conn)
+    console.print(f"Outcomes recorded: {rep.n_outcomes} "
+                  f"({rep.n_positive} advanced, {rep.n_negative} rejected)")
+    if rep.avg_score_positive is not None:
+        console.print(f"Avg score — advanced: {rep.avg_score_positive}")
+    if rep.avg_score_negative is not None:
+        console.print(f"Avg score — rejected: {rep.avg_score_negative}")
+    console.print(f"[bold]{rep.verdict}[/]")
+    if rep.suggestions:
+        console.print("\n[bold]Suggestions (you approve before applying):[/]")
+        for s in rep.suggestions:
+            console.print(f"  - {s}")
+        console.print("[dim]To apply: edit weights.json in JOBPILOT_HOME; scoring picks it up.[/]")
 
 
 @app.command()
@@ -379,6 +463,46 @@ def board() -> None:
             score_cell,
         )
     console.print(listing)
+
+    # Top-scoring jobs I have NOT applied to yet (where to spend effort).
+    not_applied = {Status.discovered.value, Status.scored.value, Status.tailored.value}
+    top = conn.execute(
+        "SELECT j.id, j.title, j.company, s.overall, s.gate_passed "
+        "FROM jobs j JOIN scores s ON s.job_id = j.id "
+        "JOIN applications a ON a.job_id = j.id "
+        "WHERE a.status IN ('discovered','scored','tailored') AND s.gate_passed = 1 "
+        "ORDER BY s.overall DESC LIMIT 5"
+    ).fetchall()
+    if top:
+        tt = Table(title="Top-scoring jobs you have not applied to yet")
+        tt.add_column("#", justify="right")
+        tt.add_column("Score", justify="right")
+        tt.add_column("Title")
+        tt.add_column("Company")
+        for r in top:
+            tt.add_row(str(r["id"]), f"{r['overall']:.2f}",
+                       (r["title"] or "(untitled)")[:40], (r["company"] or "—")[:24])
+        console.print(tt)
+
+    # Weekly application count — honest, from real applied_at timestamps.
+    week = conn.execute(
+        "SELECT COUNT(*) n FROM applications "
+        "WHERE applied_at IS NOT NULL AND applied_at >= datetime('now', '-7 days')"
+    ).fetchone()["n"]
+    console.print(f"Applications in the last 7 days: [bold]{week}[/]")
+
+    # Highest-leverage gap to learn next.
+    try:
+        from . import gaps as gaps_mod
+
+        lead = gaps_mod.highest_leverage(conn)
+        if lead:
+            console.print(
+                f"Skill to learn next: [bold]{lead['skill']}[/] "
+                f"(wanted by {lead['jobs']} job(s)). {lead['suggestion']}"
+            )
+    except Exception:
+        pass
 
 
 @app.command()
