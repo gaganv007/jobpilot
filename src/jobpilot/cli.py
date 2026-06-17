@@ -46,10 +46,56 @@ _NOT_YET = "This command lands in a later build phase."
 
 
 @app.command()
-def add(url: str = typer.Argument(..., help="Job posting URL to fetch and store.")) -> None:
-    """Extract a pasted job URL, dedup, and store it. (Phase 1)"""
-    console.print(f"[yellow]add[/]: {_NOT_YET}")
-    raise typer.Exit(code=1)
+def add(
+    url: str = typer.Argument(..., help="Job posting URL to fetch and store."),
+    delay: float = typer.Option(
+        None, "--delay", help="Seconds to wait before fetching (politeness)."
+    ),
+) -> None:
+    """Extract a pasted job URL, dedup, and store it.
+
+    Only this single URL is fetched. robots.txt is honored; nothing is submitted.
+    """
+    from . import extract
+
+    if not extract.is_valid_url(url):
+        console.print(f"[red]Not a valid http(s) URL:[/] {url}")
+        raise typer.Exit(code=1)
+
+    conn = db.connect()
+    # Dedup first — cheaper than fetching, and we never re-scrape a known URL.
+    existing = db.job_by_url(conn, url)
+    if existing is not None:
+        console.print(
+            f"[yellow]Already tracked[/] as job {existing['id']}: "
+            f"{existing['title'] or '(untitled)'} — not re-fetching."
+        )
+        raise typer.Exit(code=0)
+
+    kwargs = {} if delay is None else {"delay": delay}
+    try:
+        with console.status(f"Fetching {url} (polite delay first)…"):
+            details = extract.extract(url, **kwargs)
+    except extract.RobotsDisallowed as e:
+        console.print(f"[red]Refusing to fetch[/]: {e}")
+        db.log_event(conn, "robots_blocked", url)
+        raise typer.Exit(code=1)
+    except Exception as e:  # network / browser errors
+        console.print(f"[red]Could not extract[/] {url}: {e}")
+        console.print(
+            "[dim]If Playwright is not installed, run: playwright install chromium[/]"
+        )
+        raise typer.Exit(code=1)
+
+    job_id, created = db.add_job(conn, **details)
+    db.log_event(conn, "add", f"{details.get('title','')} @ {details.get('company','')}", job_id=job_id)
+    console.print(
+        f"[green]Added job {job_id}[/]: [bold]{details.get('title') or '(untitled)'}[/]"
+        f" @ {details.get('company') or '(unknown company)'}"
+        f"  [dim]{details.get('location') or ''}[/]"
+    )
+    console.print(f"[dim]JD captured: {len(details.get('jd_text',''))} chars. "
+                  f"Next: jobpilot score {job_id}[/]")
 
 
 @app.command()
@@ -92,21 +138,47 @@ def batch(urls_file: str = typer.Argument(..., help="Text file of URLs, one per 
 
 @app.command()
 def board() -> None:
-    """Dashboard: pipeline by status (full dashboard in Phase 1/6)."""
+    """Dashboard: pipeline by status and tracked jobs (full dashboard in Phase 6)."""
+    from rich.table import Table
+
     conn = db.connect()
     counts = db.status_counts(conn)
     if not counts:
         console.print("No jobs yet. Add one with [bold]jobpilot add <url>[/].")
         return
-    from rich.table import Table
 
-    table = Table(title="Pipeline by status")
-    table.add_column("Status")
-    table.add_column("Count", justify="right")
+    pipe = Table(title="Pipeline by status")
+    pipe.add_column("Status")
+    pipe.add_column("Count", justify="right")
     for st in Status:
         if st.value in counts:
-            table.add_row(st.value, str(counts[st.value]))
-    console.print(table)
+            pipe.add_row(st.value, str(counts[st.value]))
+    console.print(pipe)
+
+    jobs = db.all_jobs(conn)
+    listing = Table(title="Tracked jobs")
+    listing.add_column("#", justify="right")
+    listing.add_column("Title")
+    listing.add_column("Company")
+    listing.add_column("Location")
+    listing.add_column("Status")
+    listing.add_column("Score", justify="right")
+    for j in jobs:
+        appn = db.get_application(conn, j["id"])
+        sc = db.get_score(conn, j["id"])
+        score_cell = "—"
+        if sc is not None:
+            mark = "" if sc["gate_passed"] else " ✗"
+            score_cell = f"{sc['overall']:.1f}{mark}"
+        listing.add_row(
+            str(j["id"]),
+            (j["title"] or "(untitled)")[:40],
+            (j["company"] or "—")[:24],
+            (j["location"] or "—")[:20],
+            appn["status"] if appn else "—",
+            score_cell,
+        )
+    console.print(listing)
 
 
 @app.command()
