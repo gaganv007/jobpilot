@@ -144,11 +144,16 @@ def score(
                 from pathlib import Path
 
                 scored = scoring.parse_score_reply(Path(reply).read_text(encoding="utf-8"))
-                # Heuristic provides rationale where the reply omitted it.
-                heur = scoring.heuristic_dimensions(job["jd_text"])
-                for d in scoring.DIMENSIONS:
-                    if not scored[d]["rationale"]:
-                        scored[d]["rationale"] = heur[d]["rationale"]
+                # Backfill missing rationale from the heuristic, but only if it's
+                # actually needed and available (heuristic needs jd_agent).
+                if any(not scored[d]["rationale"] for d in scoring.DIMENSIONS):
+                    try:
+                        heur = scoring.heuristic_dimensions(job["jd_text"])
+                        for d in scoring.DIMENSIONS:
+                            if not scored[d]["rationale"]:
+                                scored[d]["rationale"] = heur[d]["rationale"]
+                    except Exception:
+                        pass
                 method = "llm"
             else:
                 scored = scoring.heuristic_dimensions(job["jd_text"])
@@ -422,7 +427,7 @@ def calibrate() -> None:
 
 @app.command()
 def board() -> None:
-    """Dashboard: pipeline by status and tracked jobs (full dashboard in Phase 6)."""
+    """Dashboard: pipeline, tracked jobs, top un-applied picks, weekly count, next skill."""
     from rich.table import Table
 
     conn = db.connect()

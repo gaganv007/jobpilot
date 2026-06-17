@@ -37,13 +37,20 @@ def test_read_urls_dedups_and_skips_comments(tmp_path):
     assert batch.read_urls(f) == ["https://a.com", "https://b.com"]
 
 
-# ---- batch processing (network mocked) ----
+# ---- batch processing (network mocked; scoring needs jd_agent) ----
+def _bridge_ok():
+    from jobpilot import jd_bridge
+
+    return jd_bridge.available()
+
+
 def _patch_extract(monkeypatch, fixture="job_jsonld.html"):
     html = (FIX / fixture).read_text(encoding="utf-8")
     monkeypatch.setattr(batch.extract, "fetch_html", lambda url, delay=0: html)
     monkeypatch.setattr(batch.extract, "robots_allows", lambda url, user_agent=None: True)
 
 
+@pytest.mark.skipif(not _bridge_ok(), reason="jd_agent not available")
 def test_batch_adds_and_scores(monkeypatch):
     _patch_extract(monkeypatch)
     urls = ["https://boards.acme.ai/jobs/1", "https://boards.acme.ai/jobs/2"]
@@ -56,6 +63,7 @@ def test_batch_adds_and_scores(monkeypatch):
     conn.close()
 
 
+@pytest.mark.skipif(not _bridge_ok(), reason="jd_agent not available")
 def test_batch_is_resumable(monkeypatch):
     _patch_extract(monkeypatch)
     url = "https://boards.acme.ai/jobs/1"
@@ -70,6 +78,7 @@ def test_batch_is_resumable(monkeypatch):
     assert results[0].status == "skipped_scored"
 
 
+@pytest.mark.skipif(not _bridge_ok(), reason="jd_agent not available")
 def test_batch_never_advances_past_scored(monkeypatch):
     _patch_extract(monkeypatch)
     batch.run_batch(["https://boards.acme.ai/jobs/1"], workers=1, delay=0)
@@ -81,12 +90,6 @@ def test_batch_never_advances_past_scored(monkeypatch):
 
 
 # ---- gaps ----
-def _bridge_ok():
-    from jobpilot import jd_bridge
-
-    return jd_bridge.available()
-
-
 @pytest.mark.skipif(not _bridge_ok(), reason="jd_agent not available")
 def test_gap_intelligence(monkeypatch):
     conn = db.connect()
