@@ -189,10 +189,73 @@ def score(
 
 
 @app.command()
-def tailor(job_id: int = typer.Argument(..., help="Job id to tailor for.")) -> None:
-    """Build an ATS-optimized resume + cover letter from real facts only. (Phase 3)"""
-    console.print(f"[yellow]tailor[/]: {_NOT_YET}")
-    raise typer.Exit(code=1)
+def tailor(
+    job_id: int = typer.Argument(..., help="Job id to tailor for."),
+    reply: str = typer.Option(
+        None, "--reply", help="Path to a Claude reply (TRACK/SUMMARY/COVER LETTER)."
+    ),
+    prompt: bool = typer.Option(
+        False, "--prompt", help="Print the paste-mode tailoring prompt and exit."
+    ),
+) -> None:
+    """Build an ATS-optimized resume + cover letter from real facts only.
+
+    Reorders skills and reframes the summary using existing facts; everything
+    else is verbatim. Emits an evidence map and an honesty receipt (diff).
+    """
+    from . import config, tailor as tailor_mod
+    from .jd_bridge import JDAgentUnavailable
+
+    conn = db.connect()
+    job = db.get_job(conn, job_id)
+    if job is None:
+        console.print(f"[red]No job with id {job_id}.[/]")
+        raise typer.Exit(code=1)
+
+    if prompt:
+        from . import jd_bridge
+
+        try:
+            track, _ = jd_bridge.match_track(job["jd_text"])
+        except JDAgentUnavailable as e:
+            console.print(f"[red]{e}[/]")
+            raise typer.Exit(code=1)
+        console.print(tailor_mod.build_tailor_prompt(job["jd_text"], job["company"], job["title"], track))
+        return
+
+    reply_text = None
+    if reply:
+        from pathlib import Path
+
+        reply_text = Path(reply).read_text(encoding="utf-8")
+
+    out_dir = config.job_dir(job_id)
+    try:
+        result = tailor_mod.tailor_job(dict(job), out_dir, reply_text=reply_text)
+    except JDAgentUnavailable as e:
+        console.print(f"[red]Cannot tailor[/]: {e}")
+        raise typer.Exit(code=1)
+
+    db.set_doc_paths(conn, job_id, resume_path=result.resume_path, cover_path=result.cover_path)
+    appn = db.get_application(conn, job_id)
+    if appn and appn["status"] in (Status.discovered.value, Status.scored.value):
+        db.set_status(conn, job_id, Status.tailored.value)
+    db.log_event(conn, "tailor", f"track={result.track}", job_id=job_id)
+
+    console.print(f"[green]Tailored job {job_id}[/] for track [bold]{result.track}[/].")
+    console.print(f"  resume:   {result.resume_path}")
+    if result.cover_path:
+        console.print(f"  cover:    {result.cover_path}")
+    else:
+        console.print(f"  cover:    [yellow]not built[/] — paste this into Claude, then re-run with --reply:")
+        console.print(f"            {result.prompt_path}")
+    console.print(f"  evidence: {result.evidence_path}")
+    console.print(f"  receipt:  {result.receipt_path}")
+    if not result.honesty.ok:
+        console.print(
+            f"  [red]Honesty guard:[/] rejected a summary that added "
+            f"unsupported skills ({', '.join(result.honesty.violations)}); used your real summary."
+        )
 
 
 @app.command()
