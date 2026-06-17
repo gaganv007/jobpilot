@@ -258,18 +258,75 @@ def tailor(
         )
 
 
-@app.command()
-def research(job_id: int = typer.Argument(..., help="Job id to research.")) -> None:
-    """Summarize the company; talking points and questions. Facts only. (Phase 4)"""
-    console.print(f"[yellow]research[/]: {_NOT_YET}")
-    raise typer.Exit(code=1)
+def _require_job(conn, job_id: int):
+    job = db.get_job(conn, job_id)
+    if job is None:
+        console.print(f"[red]No job with id {job_id}.[/]")
+        raise typer.Exit(code=1)
+    return dict(job)
 
 
 @app.command()
-def prep(job_id: int = typer.Argument(..., help="Job id to prep for.")) -> None:
-    """Generate STAR+R interview stories from real experience. (Phase 4)"""
-    console.print(f"[yellow]prep[/]: {_NOT_YET}")
-    raise typer.Exit(code=1)
+def research(
+    job_id: int = typer.Argument(..., help="Job id to research."),
+    prompt: bool = typer.Option(False, "--prompt", help="Print a web-research LLM prompt instead."),
+) -> None:
+    """Summarize the company; talking points and questions. Facts only."""
+    from . import config, research as research_mod
+
+    conn = db.connect()
+    job = _require_job(conn, job_id)
+    if prompt:
+        console.print(research_mod.build_research_prompt(job))
+        return
+    doc = research_mod.build_research_doc(job)
+    out = config.job_dir(job_id) / "research.md"
+    out.write_text(doc, encoding="utf-8")
+    db.log_event(conn, "research", str(out), job_id=job_id)
+    from rich.markdown import Markdown
+
+    console.print(Markdown(doc))
+    console.print(f"[dim]Saved: {out}[/]")
+
+
+@app.command()
+def prep(
+    job_id: int = typer.Argument(..., help="Job id to prep for."),
+    prompt: bool = typer.Option(False, "--prompt", help="Print an LLM prep prompt instead."),
+) -> None:
+    """Generate STAR+R interview stories from real experience, plus likely topics."""
+    from . import config, prep as prep_mod
+
+    conn = db.connect()
+    job = _require_job(conn, job_id)
+    if prompt:
+        console.print(prep_mod.build_prep_prompt(job))
+        return
+    doc = prep_mod.build_prep_doc(job)
+    out = config.job_dir(job_id) / "prep.md"
+    out.write_text(doc, encoding="utf-8")
+    db.log_event(conn, "prep", str(out), job_id=job_id)
+    from rich.markdown import Markdown
+
+    console.print(Markdown(doc))
+    console.print(f"[dim]Saved: {out}[/]")
+
+
+@app.command()
+def packet(job_id: int = typer.Argument(..., help="Job id to assemble a packet for.")) -> None:
+    """Assemble the one-page application packet (open this before you apply)."""
+    from . import config, packet as packet_mod
+
+    conn = db.connect()
+    _require_job(conn, job_id)
+    doc = packet_mod.build_packet(conn, job_id)
+    out = config.job_dir(job_id) / "packet.md"
+    out.write_text(doc, encoding="utf-8")
+    db.log_event(conn, "packet", str(out), job_id=job_id)
+    from rich.markdown import Markdown
+
+    console.print(Markdown(doc))
+    console.print(f"[dim]Saved: {out}[/]")
 
 
 @app.command()
