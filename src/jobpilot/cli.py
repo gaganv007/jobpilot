@@ -102,10 +102,90 @@ def add(
 def score(
     job_id: int = typer.Argument(None, help="Job id to score."),
     all_unscored: bool = typer.Option(False, "--all-unscored", help="Score every unscored job."),
+    reply: str = typer.Option(
+        None, "--reply", help="Path to an LLM JSON scoring reply (paste mode)."
+    ),
+    prompt: bool = typer.Option(
+        False, "--prompt", help="Print the paste-mode scoring prompt instead of scoring."
+    ),
 ) -> None:
-    """Run the gated scoring rubric. (Phase 2)"""
-    console.print(f"[yellow]score[/]: {_NOT_YET}")
-    raise typer.Exit(code=1)
+    """Run the gated scoring rubric and store scores + per-dimension rationale.
+
+    Default is a deterministic, offline heuristic (honest, explainable). Use
+    --prompt to get an LLM prompt, then --reply <file> to ingest a richer score.
+    """
+    from . import scoring
+
+    conn = db.connect()
+
+    if all_unscored:
+        ids = db.unscored_job_ids(conn)
+        if not ids:
+            console.print("Nothing to score — all jobs already scored.")
+            return
+    else:
+        if job_id is None:
+            console.print("[red]Provide a job_id or --all-unscored.[/]")
+            raise typer.Exit(code=1)
+        ids = [job_id]
+
+    for jid in ids:
+        job = db.get_job(conn, jid)
+        if job is None:
+            console.print(f"[red]No job with id {jid}.[/]")
+            continue
+
+        if prompt:
+            console.print(scoring.build_score_prompt(job["jd_text"], job["company"], job["title"]))
+            continue
+
+        try:
+            if reply:
+                from pathlib import Path
+
+                scored = scoring.parse_score_reply(Path(reply).read_text(encoding="utf-8"))
+                # Heuristic provides rationale where the reply omitted it.
+                heur = scoring.heuristic_dimensions(job["jd_text"])
+                for d in scoring.DIMENSIONS:
+                    if not scored[d]["rationale"]:
+                        scored[d]["rationale"] = heur[d]["rationale"]
+                method = "llm"
+            else:
+                scored = scoring.heuristic_dimensions(job["jd_text"])
+                method = "heuristic"
+        except Exception as e:
+            console.print(f"[red]Scoring failed for job {jid}: {e}[/]")
+            raise typer.Exit(code=1)
+
+        dims = scoring.dims_only(scored)
+        overall, gate_passed = scoring.compute_overall(dims)
+        rationale = scoring.rationale_text(scored)
+        import json as _json
+
+        db.upsert_score(conn, jid, overall, gate_passed, _json.dumps(dims), rationale)
+        # Advance discovered -> scored, but never override a human-set status.
+        appn = db.get_application(conn, jid)
+        if appn and appn["status"] == Status.discovered.value:
+            db.set_status(conn, jid, Status.scored.value)
+        db.log_event(conn, "score", f"{overall:.1f} ({scoring.band(overall, gate_passed)}, {method})", job_id=jid)
+
+        verdict = scoring.band(overall, gate_passed)
+        color = "green" if gate_passed and overall >= 3 else ("yellow" if gate_passed else "red")
+        console.print(
+            f"[{color}]Job {jid}: {overall:.2f}/5 — {verdict}[/]"
+            f"  (gate {'PASS' if gate_passed else 'FAIL'}, {method})"
+        )
+        if not all_unscored:
+            from rich.table import Table
+
+            t = Table(show_header=True)
+            t.add_column("Dimension")
+            t.add_column("Score", justify="right")
+            t.add_column("Why")
+            for d in scoring.DIMENSIONS:
+                gate_tag = " [dim](gate)[/]" if d in scoring.GATES else ""
+                t.add_row(d + gate_tag, f"{scored[d]['score']}/5", scored[d]["rationale"])
+            console.print(t)
 
 
 @app.command()
