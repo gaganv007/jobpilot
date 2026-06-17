@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# JobPilot local data (private, never committed)
+jobpilot.db
+jobpilot.db-*
+*.lock
+/data/
+/output/
+.jobpilot/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+.claude/
+.venv/
