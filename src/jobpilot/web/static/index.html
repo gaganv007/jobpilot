@@ -28,8 +28,7 @@
     <div class="tabs">
       <button class="tab active" data-tab="paste">Paste JD</button>
       <button class="tab" data-tab="url">Fetch URL</button>
-      <button class="tab" data-tab="discover">Discover jobs</button>
-      <button class="tab" data-tab="scan">Scan top companies</button>
+      <button class="tab" data-tab="search">🔎 Search jobs</button>
     </div>
 
     <div class="tabpane active" data-pane="paste">
@@ -52,27 +51,15 @@
       <p class="hint">Only this one URL is fetched. robots.txt is honored. Needs <code>playwright install chromium</code>.</p>
     </div>
 
-    <div class="tabpane" data-pane="discover">
+    <div class="tabpane" data-pane="search">
       <div class="row">
-        <input id="d-query" placeholder="Search e.g. machine learning, data scientist…" />
-        <label class="chk"><input type="checkbox" id="d-remotive" checked /> Remotive</label>
-        <label class="chk"><input type="checkbox" id="d-arbeitnow" checked /> Arbeitnow</label>
-        <label class="chk"><input type="checkbox" id="d-senior" /> Include senior</label>
-        <button class="btn primary" id="d-search">Search</button>
+        <input id="x-query" placeholder="Role e.g. machine learning, data scientist, software engineer" />
+        <input id="x-location" placeholder="Location (optional) e.g. Boston, Remote" style="max-width:240px" />
+        <label class="chk"><input type="checkbox" id="x-senior" /> Include senior</label>
+        <button class="btn primary" id="x-search">Search jobs</button>
       </div>
-      <p class="hint">Ranked by fit to your resumes; senior/principal/manager roles hidden by default. Public APIs, review-only.</p>
-      <div id="d-results" class="discover-results"></div>
-    </div>
-
-    <div class="tabpane" data-pane="scan">
-      <div class="row">
-        <input id="s-query" placeholder="Filter by role keyword e.g. machine learning (leave blank for your best fits)" />
-        <label class="chk"><input type="checkbox" id="s-senior" /> Include senior</label>
-        <button class="btn primary" id="s-search">Scan companies</button>
-      </div>
-      <p class="hint">Pulls roles from top companies' public ATS feeds, then ranks them by fit to your resumes. The box filters by role keyword, not company name. Senior/principal/manager roles hidden by default.</p>
-      <div id="s-targets" class="chips" style="margin-top:8px"></div>
-      <div id="s-results" class="discover-results"></div>
+      <p class="hint">Searches 30+ top companies' official job feeds plus public boards, ranked by fit to your resumes. Senior/off-track roles hidden by default. Every result has a real apply link. JobPilot never applies for you.</p>
+      <div id="x-results" class="discover-results"></div>
     </div>
   </section>
 

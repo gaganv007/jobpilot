@@ -23,9 +23,13 @@ def test_scan_greenhouse_normalizes(monkeypatch):
     assert out[0]["company"] == "Anthropic"
     assert out[0]["title"] == "ML Engineer"
     assert out[0]["remote"] is True
-    # HTML entities unescaped and tags stripped
-    assert "ML" in out[0]["jd_text"] and "<" not in out[0]["jd_text"]
     assert out[0]["source"] == "greenhouse/anthropic"
+    # JD is kept raw by the fetcher (cleaned lazily, only for matched jobs).
+    assert "jd_raw" in out[0]
+    # scan() cleans matched jobs: entities unescaped + tags stripped.
+    monkeypatch.setattr(scan, "scan_target", lambda ats, token, label=None: out)
+    cleaned = scan.scan([("greenhouse", "anthropic", "Anthropic")], query="ml")
+    assert "ML" in cleaned[0]["jd_text"] and "<" not in cleaned[0]["jd_text"]
 
 
 def test_scan_filters_by_query(monkeypatch):

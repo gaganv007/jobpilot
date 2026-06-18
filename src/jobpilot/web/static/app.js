@@ -244,10 +244,11 @@ function renderDrawer(j) {
     <div class="d-head">
       <div>
         <h2>${esc(j.title || "(untitled)")}</h2>
-        <div class="sub">${esc(j.company || "—")}${j.location ? " · " + esc(j.location) : ""} · <a href="${esc(j.url)}" target="_blank" style="color:var(--accent)">posting ↗</a></div>
+        <div class="sub">${esc(j.company || "—")}${j.location ? " · " + esc(j.location) : ""}</div>
       </div>
       <button class="x" id="close-x">×</button>
     </div>
+    ${j.url ? `<a class="btn primary apply-cta" href="${esc(j.url)}" target="_blank" rel="noopener">Open posting & Apply ↗</a>` : ""}
     ${legitHtml}
 
     <div class="d-section">
@@ -402,20 +403,6 @@ async function addUrl(btn) {
   finally { btn.disabled = false; btn.innerHTML = old; }
 }
 
-async function discoverJobs(btn) {
-  const query = $("#d-query").value.trim();
-  const sources = [];
-  if ($("#d-remotive").checked) sources.push("remotive");
-  if ($("#d-arbeitnow").checked) sources.push("arbeitnow");
-  if (!sources.length) return toast("Pick at least one source.", true);
-  const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spin"></span> searching`;
-  try {
-    const r = await api("/api/discover", { method: "POST", body: JSON.stringify({ query, sources, limit: 25, include_senior: $("#d-senior").checked }) });
-    renderCandidates("#d-results", r.results || [], r.total_found);
-  } catch (e) { toast(e.message, true); }
-  finally { btn.disabled = false; btn.innerHTML = old; }
-}
-
 async function bulkAddScore(results, btn) {
   const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spin"></span> adding`;
   try {
@@ -448,13 +435,15 @@ function renderCandidates(boxSel, results, totalFound) {
       ? `<span class="fitbadge ${j.fit >= 60 ? "hi" : j.fit >= 35 ? "mid" : "lo"}">${j.fit}% fit</span>` : "";
     const track = j.track ? `<span class="trackbadge">${esc(j.track)}</span>` : "";
     const sen = j.seniority === "senior" ? `<span class="senbadge">senior</span>` : "";
+    const applyUrl = j.apply_url || j.url;
+    const apply = applyUrl ? `<a class="btn sm" href="${esc(applyUrl)}" target="_blank" rel="noopener">Apply ↗</a>` : "";
     return `
     <div class="dres">
       <div>
         <div class="t">${fit} ${esc(j.title)} ${sen}</div>
         <div class="meta">${esc(j.company || "—")} · ${esc(j.location || "")} · ${esc(j.source)}${j.remote ? " · remote" : ""} ${track}</div>
       </div>
-      <button class="btn sm primary" data-i="${i}">Add</button>
+      <div class="dres-actions">${apply}<button class="btn sm primary" data-i="${i}">Add</button></div>
     </div>`;
   }).join("");
   $$("[data-i]", box).forEach((b) => b.addEventListener("click", async () => {
@@ -473,22 +462,19 @@ function renderCandidates(boxSel, results, totalFound) {
   if (bulkBtn) bulkBtn.addEventListener("click", () => bulkAddScore(results, bulkBtn));
 }
 
-async function scanJobs(btn) {
-  const query = $("#s-query").value.trim();
-  const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spin"></span> scanning`;
+async function searchJobs(btn) {
+  const query = $("#x-query").value.trim();
+  const location = $("#x-location").value.trim();
+  const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spin"></span> searching 30+ companies…`;
+  $("#x-results").innerHTML = `<p class="empty">Searching top companies and job boards…</p>`;
   try {
-    const r = await api("/api/scan", { method: "POST", body: JSON.stringify({ query, limit: 50, include_senior: $("#s-senior").checked }) });
-    renderCandidates("#s-results", r.results || [], r.total_found);
-    if ((r.results || []).length) toast(`${r.results.length} best-fit roles (of ${r.total_found} scanned).`);
-  } catch (e) { toast(e.message, true); }
+    const r = await api("/api/search", { method: "POST", body: JSON.stringify({
+      query, location, include_senior: $("#x-senior").checked, limit: 60,
+    }) });
+    renderCandidates("#x-results", r.results || [], r.total_found);
+    if ((r.results || []).length) toast(`${r.results.length} best-fit roles (of ${r.total_found} found).`);
+  } catch (e) { toast(e.message, true); $("#x-results").innerHTML = `<p class="empty">${esc(e.message)}</p>`; }
   finally { btn.disabled = false; btn.innerHTML = old; }
-}
-
-async function loadScanTargets() {
-  try {
-    const r = await api("/api/scan/targets");
-    $("#s-targets").innerHTML = (r.targets || []).map((t) => `<span class="chip have">${esc(t[2])}</span>`).join("");
-  } catch (_) {}
 }
 
 // ---------- wire up ----------
@@ -501,9 +487,8 @@ function init() {
   }));
   $("#p-add").addEventListener("click", addPaste);
   $("#u-add").addEventListener("click", (e) => addUrl(e.target));
-  $("#d-search").addEventListener("click", (e) => discoverJobs(e.target.closest("button")));
-  $("#s-search").addEventListener("click", (e) => scanJobs(e.target.closest("button")));
-  loadScanTargets();
+  $("#x-search").addEventListener("click", (e) => searchJobs(e.target.closest("button")));
+  $("#x-query").addEventListener("keydown", (e) => { if (e.key === "Enter") searchJobs($("#x-search")); });
   $("#overlay").addEventListener("click", closeDrawer);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
 

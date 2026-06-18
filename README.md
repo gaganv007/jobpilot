@@ -38,9 +38,11 @@ jobpilot serve                   # then open http://127.0.0.1:8000
 A single-page dashboard over the whole engine:
 
 - **Kanban pipeline** by status with live fit-score pills (strong / solid / FAIL / unscored).
-- **Add jobs four ways:** paste a JD, fetch one URL (robots-respected), **Discover** (public job
-  APIs: Remotive, Arbeitnow), or **Scan top companies** — pull open roles straight from 15+ top
-  companies' official public ATS feeds (Greenhouse, Lever, Ashby). All opt-in, review-only, no scraping.
+- **One powerful search:** the **🔎 Search jobs** tab queries 30+ top companies' official job feeds
+  (Greenhouse, Lever, Ashby) **and** public boards (The Muse, Remotive, Arbeitnow) in parallel, merges
+  and de-dupes them, and ranks everything by fit to your resumes — senior/off-track roles hidden by
+  default, a real **Apply** link on every result. Optional location filter. Opt-in, review-only, no scraping.
+- Also add jobs by pasting a JD or fetching a single URL (robots-respected).
 - **Legitimacy gate:** every job is checked for scam and ghost-job signals; high-risk postings get a
   red banner so you never waste an application on them.
 - **Per-job drawer:** the gated score with per-dimension bars (gates highlighted), an **ATS keyword

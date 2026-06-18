@@ -65,6 +65,15 @@ class ScanReq(BaseModel):
     include_senior: bool = False
 
 
+class SearchReq(BaseModel):
+    query: str = ""
+    location: str = ""
+    include_senior: bool = False
+    limit: int = 50
+    companies: bool = True   # include top-company ATS feeds
+    boards: bool = True      # include public job boards (Muse/Remotive/Arbeitnow)
+
+
 class Candidate(BaseModel):
     url: str | None = None
     company: str = ""
@@ -225,6 +234,44 @@ def discover_jobs(body: DiscoverReq):
     raw = discover.discover(body.query, body.sources, body.limit)
     ranked = relevance.rank(raw, include_senior=body.include_senior)
     return {"results": ranked, "total_found": len(raw)}
+
+
+@app.post("/api/search")
+def unified_search(body: SearchReq):
+    """The main job searcher: query top companies' ATS feeds AND public job
+    boards in parallel, merge, rank by fit to my resumes, hide senior/off-track.
+    Every result has a real apply link. Public APIs only, user-triggered."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from .. import relevance
+
+    raw: list[dict] = []
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futs = []
+        if body.companies:
+            futs.append(pool.submit(scan_mod.scan, None, body.query, 12, 120))
+        if body.boards:
+            futs.append(pool.submit(discover.search, body.query, body.location, None, 40))
+        for f in futs:
+            try:
+                raw.extend(f.result())
+            except Exception:
+                pass
+
+    # De-dupe across sources by url, and by (company, title) to drop the same
+    # role reposted under multiple location URLs.
+    seen_url, seen_key, merged = set(), set(), []
+    for r in raw:
+        u = r.get("url", "")
+        key = (r.get("company", "").lower(), r.get("title", "").lower())
+        if not u or u in seen_url or key in seen_key:
+            continue
+        seen_url.add(u)
+        seen_key.add(key)
+        merged.append(r)
+
+    ranked = relevance.rank(merged, include_senior=body.include_senior)
+    return {"results": ranked[: body.limit], "total_found": len(merged)}
 
 
 @app.get("/api/scan/targets")
