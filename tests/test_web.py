@@ -76,8 +76,10 @@ def test_file_endpoint_blocks_traversal():
 
 
 def test_discover_endpoint_monkeypatched(monkeypatch):
-    sample = [{"url": "https://j/1", "company": "Co", "title": "ML Eng",
-               "location": "Remote", "source": "remotive.com", "jd_text": "ml", "remote": True}]
+    sample = [{"url": "https://j/1", "company": "Co", "title": "Machine Learning Engineer",
+               "location": "Remote", "source": "remotive.com",
+               "jd_text": "Build machine learning and deep learning with Python, PyTorch and LLM.",
+               "remote": True}]
     monkeypatch.setattr(discover, "discover", lambda q, s=None, limit=25: sample)
     # server imported the module symbol; patch there too
     from jobpilot.web import server
@@ -85,7 +87,8 @@ def test_discover_endpoint_monkeypatched(monkeypatch):
 
     r = client.post("/api/discover", json={"query": "ml", "sources": ["remotive"]})
     assert r.status_code == 200
-    assert r.json()["results"][0]["title"] == "ML Eng"
+    assert r.json()["results"][0]["title"] == "Machine Learning Engineer"
+    assert r.json()["results"][0]["fit"] > 0  # annotated with resume fit
 
 
 def test_discover_parsing_from_fake_payload(monkeypatch):

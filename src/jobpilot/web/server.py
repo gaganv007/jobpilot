@@ -55,12 +55,14 @@ class DiscoverReq(BaseModel):
     query: str = ""
     sources: list[str] | None = None
     limit: int = 25
+    include_senior: bool = False
 
 
 class ScanReq(BaseModel):
     query: str = ""
     targets: list[list[str]] | None = None  # [[ats, token, label], ...]
     limit: int = 60
+    include_senior: bool = False
 
 
 class Candidate(BaseModel):
@@ -209,7 +211,11 @@ def add_fetch(body: FetchJob):
 @app.post("/api/discover")
 def discover_jobs(body: DiscoverReq):
     # Public APIs only; returns candidates for review (nothing is stored).
-    return {"results": discover.discover(body.query, body.sources, body.limit)}
+    from .. import relevance
+
+    raw = discover.discover(body.query, body.sources, body.limit)
+    ranked = relevance.rank(raw, include_senior=body.include_senior)
+    return {"results": ranked, "total_found": len(raw)}
 
 
 @app.get("/api/scan/targets")
@@ -220,8 +226,13 @@ def scan_targets():
 @app.post("/api/scan")
 def scan_jobs(body: ScanReq):
     # Public ATS feeds (Greenhouse/Lever/Ashby), user-triggered, review-only.
+    # Results are ranked by fit to my resumes; senior roles hidden by default.
+    from .. import relevance
+
     targets = [tuple(t) for t in body.targets] if body.targets else None
-    return {"results": scan_mod.scan(targets, query=body.query, total_limit=body.limit)}
+    raw = scan_mod.scan(targets, query=body.query, total_limit=max(body.limit, 120))
+    ranked = relevance.rank(raw, include_senior=body.include_senior)
+    return {"results": ranked[:body.limit], "total_found": len(raw)}
 
 
 # ---------- per-job ----------

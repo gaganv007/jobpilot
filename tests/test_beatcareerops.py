@@ -48,8 +48,10 @@ def test_scan_dedupes_urls(monkeypatch):
 def test_scan_endpoint(monkeypatch):
     from jobpilot.web import server
     monkeypatch.setattr(server.scan_mod, "scan", lambda targets=None, query="", total_limit=60: [
-        {"url": "u", "title": "ML Eng", "company": "Anthropic", "location": "Remote",
-         "source": "greenhouse/anthropic", "jd_text": "ml", "remote": True}])
+        {"url": "u", "title": "Machine Learning Engineer", "company": "Anthropic", "location": "Remote",
+         "source": "greenhouse/anthropic",
+         "jd_text": "Build machine learning and deep learning systems with Python and PyTorch and LLM.",
+         "remote": True}])
     r = client.post("/api/scan", json={"query": "ml"})
     assert r.status_code == 200
     assert r.json()["results"][0]["company"] == "Anthropic"

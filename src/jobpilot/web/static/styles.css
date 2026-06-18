@@ -111,6 +111,12 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 }
 .dres .meta { font-size: 12px; color: var(--muted); }
 .dres .t { font-weight: 600; font-size: 14px; }
+.fitbadge { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; margin-right: 2px; }
+.fitbadge.hi { background: rgba(40,199,111,.16); color: var(--good); }
+.fitbadge.mid { background: rgba(79,140,255,.16); color: var(--accent); }
+.fitbadge.lo { background: rgba(255,159,67,.14); color: var(--warn); }
+.trackbadge { font-size: 10.5px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); margin-left: 4px; }
+.senbadge { font-size: 10px; padding: 1px 6px; border-radius: 999px; background: rgba(234,84,85,.14); color: #ff8b8b; margin-left: 4px; }
 
 /* board */
 .board { display: flex; gap: 14px; padding: 8px 24px 40px; overflow-x: auto; align-items: flex-start; }

@@ -404,8 +404,8 @@ async function discoverJobs(btn) {
   if (!sources.length) return toast("Pick at least one source.", true);
   const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spin"></span> searching`;
   try {
-    const r = await api("/api/discover", { method: "POST", body: JSON.stringify({ query, sources, limit: 25 }) });
-    renderCandidates("#d-results", r.results || []);
+    const r = await api("/api/discover", { method: "POST", body: JSON.stringify({ query, sources, limit: 25, include_senior: $("#d-senior").checked }) });
+    renderCandidates("#d-results", r.results || [], r.total_found);
   } catch (e) { toast(e.message, true); }
   finally { btn.disabled = false; btn.innerHTML = old; }
 }
@@ -423,19 +423,33 @@ async function bulkAddScore(results, btn) {
   finally { btn.disabled = false; btn.innerHTML = old; }
 }
 
-function renderCandidates(boxSel, results) {
+function renderCandidates(boxSel, results, totalFound) {
   const box = $(boxSel);
-  if (!results.length) { box.innerHTML = `<p class="empty">No results. Try a different query.</p>`; return; }
-  const header = `<div class="cand-head"><span>${results.length} roles found</span>
+  if (!results.length) {
+    const note = totalFound
+      ? `${totalFound} roles found, but none matched your resumes at an early-career level. Tick “Include senior” or try another keyword.`
+      : "No results. Try a different keyword.";
+    box.innerHTML = `<p class="empty">${note}</p>`;
+    return;
+  }
+  const found = totalFound && totalFound > results.length
+    ? `${results.length} best-fit of ${totalFound} found` : `${results.length} roles, best fit first`;
+  const header = `<div class="cand-head"><span>${found}</span>
     <button class="btn sm primary" id="bulk-${boxSel.slice(1)}">⚡ Add all &amp; score</button></div>`;
-  box.innerHTML = header + results.map((j, i) => `
+  box.innerHTML = header + results.map((j, i) => {
+    const fit = (j.fit != null)
+      ? `<span class="fitbadge ${j.fit >= 60 ? "hi" : j.fit >= 35 ? "mid" : "lo"}">${j.fit}% fit</span>` : "";
+    const track = j.track ? `<span class="trackbadge">${esc(j.track)}</span>` : "";
+    const sen = j.seniority === "senior" ? `<span class="senbadge">senior</span>` : "";
+    return `
     <div class="dres">
       <div>
-        <div class="t">${esc(j.title)}</div>
-        <div class="meta">${esc(j.company || "—")} · ${esc(j.location || "")} · ${esc(j.source)}${j.remote ? " · remote" : ""}</div>
+        <div class="t">${fit} ${esc(j.title)} ${sen}</div>
+        <div class="meta">${esc(j.company || "—")} · ${esc(j.location || "")} · ${esc(j.source)}${j.remote ? " · remote" : ""} ${track}</div>
       </div>
       <button class="btn sm primary" data-i="${i}">Add</button>
-    </div>`).join("");
+    </div>`;
+  }).join("");
   $$("[data-i]", box).forEach((b) => b.addEventListener("click", async () => {
     const j = results[+b.dataset.i];
     b.disabled = true; b.innerHTML = `<span class="spin"></span>`;
@@ -456,9 +470,9 @@ async function scanJobs(btn) {
   const query = $("#s-query").value.trim();
   const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spin"></span> scanning`;
   try {
-    const r = await api("/api/scan", { method: "POST", body: JSON.stringify({ query, limit: 50 }) });
-    renderCandidates("#s-results", r.results || []);
-    if ((r.results || []).length) toast(`Found ${r.results.length} roles across top companies.`);
+    const r = await api("/api/scan", { method: "POST", body: JSON.stringify({ query, limit: 50, include_senior: $("#s-senior").checked }) });
+    renderCandidates("#s-results", r.results || [], r.total_found);
+    if ((r.results || []).length) toast(`${r.results.length} best-fit roles (of ${r.total_found} scanned).`);
   } catch (e) { toast(e.message, true); }
   finally { btn.disabled = false; btn.innerHTML = old; }
 }
