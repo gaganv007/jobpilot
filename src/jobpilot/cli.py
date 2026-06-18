@@ -511,6 +511,19 @@ def board() -> None:
 
 
 @app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", help="Bind host."),
+    port: int = typer.Option(8000, help="Bind port."),
+    reload: bool = typer.Option(False, "--reload", help="Auto-reload (dev)."),
+) -> None:
+    """Launch the JobPilot web app (open http://HOST:PORT in your browser)."""
+    import uvicorn
+
+    console.print(f"[green]JobPilot web[/] → http://{host}:{port}  [dim](Ctrl-C to stop)[/]")
+    uvicorn.run("jobpilot.web.server:app", host=host, port=port, reload=reload)
+
+
+@app.command()
 def status(
     job_id: int = typer.Argument(..., help="Job id to update."),
     new_status: str = typer.Argument(..., help="New pipeline status."),

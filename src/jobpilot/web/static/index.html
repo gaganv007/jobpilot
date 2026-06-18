@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JobPilot</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">✈</span>
+      <div>
+        <h1>JobPilot</h1>
+        <p class="tag">Automates the analysis, never the decision.</p>
+      </div>
+    </div>
+    <div class="top-right">
+      <span class="badge badge-guard" title="JobPilot never submits an application for you">🔒 Never applies for you</span>
+      <span id="jdagent" class="badge badge-muted" title="jd_agent resume engine status">engine: …</span>
+    </div>
+  </header>
+
+  <section class="stats" id="stats"></section>
+
+  <section class="addbar">
+    <div class="tabs">
+      <button class="tab active" data-tab="paste">Paste JD</button>
+      <button class="tab" data-tab="url">Fetch URL</button>
+      <button class="tab" data-tab="discover">Discover jobs</button>
+    </div>
+
+    <div class="tabpane active" data-pane="paste">
+      <div class="row">
+        <input id="p-title" placeholder="Role title (optional)" />
+        <input id="p-company" placeholder="Company (optional)" />
+        <input id="p-location" placeholder="Location (optional)" />
+      </div>
+      <textarea id="p-jd" rows="5" placeholder="Paste the full job description here…"></textarea>
+      <div class="row end">
+        <button class="btn primary" id="p-add">Add job</button>
+      </div>
+    </div>
+
+    <div class="tabpane" data-pane="url">
+      <div class="row">
+        <input id="u-url" placeholder="https://boards.example.com/jobs/123" />
+        <button class="btn primary" id="u-add">Fetch &amp; add</button>
+      </div>
+      <p class="hint">Only this one URL is fetched. robots.txt is honored. Needs <code>playwright install chromium</code>.</p>
+    </div>
+
+    <div class="tabpane" data-pane="discover">
+      <div class="row">
+        <input id="d-query" placeholder="Search e.g. machine learning, data scientist…" />
+        <label class="chk"><input type="checkbox" id="d-remotive" checked /> Remotive</label>
+        <label class="chk"><input type="checkbox" id="d-arbeitnow" checked /> Arbeitnow</label>
+        <button class="btn primary" id="d-search">Search</button>
+      </div>
+      <p class="hint">Opt-in discovery via public job APIs (no scraping). Results are for you to review and add.</p>
+      <div id="d-results" class="discover-results"></div>
+    </div>
+  </section>
+
+  <main class="board" id="board"></main>
+
+  <!-- Detail drawer -->
+  <div class="drawer-overlay" id="overlay"></div>
+  <aside class="drawer" id="drawer">
+    <div id="drawer-body"></div>
+  </aside>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

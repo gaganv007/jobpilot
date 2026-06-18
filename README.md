@@ -26,8 +26,28 @@ follows the same philosophy.
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-playwright install chromium      # for live JD extraction (jobpilot add)
+playwright install chromium      # for live JD extraction (jobpilot add / Fetch URL)
 ```
+
+## Web app (recommended)
+
+```bash
+jobpilot serve                   # then open http://127.0.0.1:8000
+```
+
+A single-page dashboard over the whole engine:
+
+- **Kanban pipeline** by status with live fit-score pills (strong / solid / FAIL / unscored).
+- **Add jobs three ways:** paste a JD, fetch one URL (robots-respected), or **Discover** —
+  opt-in search of public job APIs (Remotive, Arbeitnow), no scraping, results you review and add.
+- **Per-job drawer:** the gated score with per-dimension bars (gates highlighted), an **ATS keyword
+  match ring** with the exact missing keywords to close, and one-click **Score / Tailor / Research /
+  Prep / Packet** plus PDF downloads.
+- **Gap intelligence** banner — the single highest-leverage skill to learn next.
+- Status changes to applied/interview/offer are clearly recorded as *your* action; JobPilot never
+  sets them for you.
+
+Prefer the terminal? The full CLI below still works — the web app is just a UI over the same engine.
 
 JobPilot reuses your existing `jd_agent` project (4 resume PDFs + `core.py`'s matching and PDF
 builders). Point to it if it isn't at `~/Desktop/jd_agent`:
