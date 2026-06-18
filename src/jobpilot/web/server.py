@@ -108,6 +108,14 @@ def _job_row_view(conn, job) -> dict:
     if sc is not None:
         view["score"] = sc["overall"]
         view["gate_passed"] = bool(sc["gate_passed"])
+    else:
+        # No full rubric yet: show an instant, cheap fit estimate so the job is
+        # rankable the moment it is added.
+        from .. import relevance
+
+        qf = relevance.quick_fit(job["title"], job["jd_text"])
+        view["quick_fit"] = qf["fit"]
+        view["quick_track"] = qf["track"]
     return view
 
 
@@ -159,7 +167,8 @@ def state():
         lead = gaps_mod.highest_leverage(conn)
     except Exception:
         pass
-    jobs.sort(key=lambda j: (j["score"] is None, -(j["score"] or 0)))
+    # Full-scored jobs first (by rubric), then quick-fit-ranked unscored jobs.
+    jobs.sort(key=lambda j: (j["score"] is None, -(j["score"] or 0), -(j.get("quick_fit") or 0)))
     return {
         "jobs": jobs,
         "counts": counts,

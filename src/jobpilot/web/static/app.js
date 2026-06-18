@@ -148,9 +148,15 @@ function renderBoard() {
 
 function cardHtml(j) {
   const [cls, label] = bandClass(j.score, j.gate_passed);
-  const pill = j.score == null
-    ? `<span class="score-pill s-none">unscored</span>`
-    : `<span class="score-pill ${cls}">${j.score.toFixed(1)} · ${label}</span>`;
+  let pill;
+  if (j.score != null) {
+    pill = `<span class="score-pill ${cls}">${j.score.toFixed(1)} · ${label}</span>`;
+  } else if (j.quick_fit != null) {
+    const qc = j.quick_fit >= 60 ? "s-strong" : j.quick_fit >= 35 ? "s-solid" : "s-weak";
+    pill = `<span class="score-pill ${qc}" title="Quick fit estimate — run Score all for the full rubric">≈${j.quick_fit}% fit</span>`;
+  } else {
+    pill = `<span class="score-pill s-none">unscored</span>`;
+  }
   return `<div class="card" data-id="${j.id}">
     <div class="ct">${esc(j.title || "(untitled)")}</div>
     <div class="cc">${esc(j.company || "—")}${j.location ? " · " + esc(j.location) : ""}</div>
@@ -413,11 +419,12 @@ async function discoverJobs(btn) {
 async function bulkAddScore(results, btn) {
   const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spin"></span> adding`;
   try {
+    // Instant: add with a quick fit estimate; full rubric is deferred to "Score all".
     const r = await api("/api/jobs/bulk", { method: "POST", body: JSON.stringify({
       jobs: results.map((j) => ({ url: j.url, title: j.title, company: j.company, location: j.location, jd_text: j.jd_text })),
-      score: true,
+      score: false,
     }) });
-    toast(`Added ${r.added}, scored ${r.scored}. Ranked on the board below.`);
+    toast(`Added ${r.added} job(s), ranked by quick fit. Hit “Score all” for the full rubric.`);
     await refresh();
   } catch (e) { toast(e.message, true); }
   finally { btn.disabled = false; btn.innerHTML = old; }
@@ -435,7 +442,7 @@ function renderCandidates(boxSel, results, totalFound) {
   const found = totalFound && totalFound > results.length
     ? `${results.length} best-fit of ${totalFound} found` : `${results.length} roles, best fit first`;
   const header = `<div class="cand-head"><span>${found}</span>
-    <button class="btn sm primary" id="bulk-${boxSel.slice(1)}">⚡ Add all &amp; score</button></div>`;
+    <button class="btn sm primary" id="bulk-${boxSel.slice(1)}">⚡ Add all</button></div>`;
   box.innerHTML = header + results.map((j, i) => {
     const fit = (j.fit != null)
       ? `<span class="fitbadge ${j.fit >= 60 ? "hi" : j.fit >= 35 ? "mid" : "lo"}">${j.fit}% fit</span>` : "";

@@ -10,6 +10,7 @@ default. It never invents skills; relevance is measured, not faked.
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 
 # Title signals. Order matters: entry words win over senior words
 # ("Junior Staff Engineer" is rare, but entry intent should dominate).
@@ -91,6 +92,20 @@ def annotate(candidate: dict) -> dict:
     # "relevant" = an engineering/ML/data role with a real keyword signal
     candidate["relevant"] = (not candidate["off_track"]) and (weight >= 3 or fit >= 35)
     return candidate
+
+
+@lru_cache(maxsize=4096)
+def _cached_fit(title: str, jd_text: str) -> tuple[int, str, str]:
+    c = annotate({"title": title, "jd_text": jd_text})
+    return c["fit"], c["track"], c["seniority"]
+
+
+def quick_fit(title: str, jd_text: str) -> dict:
+    """Instant, cheap fit estimate for a job (no resume-PDF reads, cached).
+
+    Used to rank jobs the moment they are added, before the full rubric runs."""
+    fit, track, seniority = _cached_fit(title or "", jd_text or "")
+    return {"fit": fit, "track": track, "seniority": seniority}
 
 
 def rank(

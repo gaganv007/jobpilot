@@ -48,8 +48,9 @@ A single-page dashboard over the whole engine:
   Prep / Outreach / Packet** plus PDF downloads.
 - **Outreach:** drafts a referral-request and a recruiter note from your real facts (networking is the
   biggest hire-rate lever) — you review and send; JobPilot never sends them.
-- **One-click triage:** scan/discover results have **Add all & score**, turning a search into a
-  ranked shortlist instantly; a **Score all** button scores everything unscored at once.
+- **One-click triage:** **Add all** ingests scan/discover results instantly with a cheap *quick-fit*
+  estimate (no PDF reads), so the board is ranked the moment jobs land; **Score all** then runs the
+  full rubric on everything when you choose.
 - **Follow-up reminders:** applications that have gone quiet for 5+ days surface as clickable nudges
   (a timely follow-up lifts response rates) — JobPilot reminds, you send.
 - **Gap intelligence** banner — the single highest-leverage skill to learn next.

@@ -542,6 +542,14 @@ def board() -> None:
         if sc is not None:
             mark = "" if sc["gate_passed"] else " ✗"
             score_cell = f"{sc['overall']:.1f}{mark}"
+        else:
+            try:
+                from . import relevance
+
+                qf = relevance.quick_fit(j["title"], j["jd_text"])
+                score_cell = f"≈{qf['fit']}%"
+            except Exception:
+                pass
         listing.add_row(
             str(j["id"]),
             (j["title"] or "(untitled)")[:40],
