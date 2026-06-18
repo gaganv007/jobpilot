@@ -20,6 +20,7 @@ from .. import (
     config,
     db,
     discover,
+    followups as followups_mod,
     gaps as gaps_mod,
     legitimacy,
     outreach as outreach_mod,
@@ -60,6 +61,19 @@ class ScanReq(BaseModel):
     query: str = ""
     targets: list[list[str]] | None = None  # [[ats, token, label], ...]
     limit: int = 60
+
+
+class Candidate(BaseModel):
+    url: str | None = None
+    company: str = ""
+    title: str = ""
+    location: str = ""
+    jd_text: str = ""
+
+
+class BulkReq(BaseModel):
+    jobs: list[Candidate]
+    score: bool = True
 
 
 class TailorReq(BaseModel):
@@ -149,6 +163,8 @@ def state():
         "counts": counts,
         "weekly_applications": week,
         "gap_lead": lead,
+        "followups": followups_mod.needs_followup(conn),
+        "unscored": len(db.unscored_job_ids(conn)),
         "statuses": [s.value for s in Status],
         "human_only": [s.value for s in HUMAN_ONLY_STATUSES],
     }
@@ -243,16 +259,10 @@ def job_detail(job_id: int):
     return view
 
 
-@app.post("/api/jobs/{job_id}/score")
-def score_job(job_id: int):
-    conn = db.connect()
+def _do_score(conn, job_id: int) -> dict:
+    """Score one job (heuristic), store it, advance discovered -> scored."""
     job = db.get_job(conn, job_id)
-    if job is None:
-        raise HTTPException(404, "No such job")
-    try:
-        scored = scoring.heuristic_dimensions(job["jd_text"])
-    except Exception as e:
-        raise HTTPException(503, f"Scoring needs jd_agent: {e}")
+    scored = scoring.heuristic_dimensions(job["jd_text"])
     dims = scoring.dims_only(scored)
     overall, gate = scoring.compute_overall(dims)
     db.upsert_score(conn, job_id, overall, gate, json.dumps(dims), scoring.rationale_text(scored))
@@ -262,6 +272,60 @@ def score_job(job_id: int):
     db.log_event(conn, "score", f"{overall:.1f}", job_id=job_id)
     return {"overall": overall, "gate_passed": gate, "band": scoring.band(overall, gate),
             "dimensions": {d: scored[d] for d in scoring.DIMENSIONS}}
+
+
+@app.post("/api/jobs/{job_id}/score")
+def score_job(job_id: int):
+    conn = db.connect()
+    if db.get_job(conn, job_id) is None:
+        raise HTTPException(404, "No such job")
+    try:
+        return _do_score(conn, job_id)
+    except Exception as e:
+        raise HTTPException(503, f"Scoring needs jd_agent: {e}")
+
+
+@app.post("/api/jobs/bulk")
+def bulk_add(body: BulkReq):
+    """Add many candidates (from scan/discover) and optionally score them, so a
+    scan turns into a ranked shortlist in one click. Never applies."""
+    conn = db.connect()
+    added, scored_n, results = 0, 0, []
+    can_score = body.score
+    for c in body.jobs:
+        if not c.jd_text.strip() and not c.url:
+            continue
+        url = c.url or f"paste://{abs(hash(c.jd_text)) % (10**12)}"
+        job_id, created = db.add_job(conn, url, company=c.company, title=c.title,
+                                     location=c.location, jd_text=c.jd_text)
+        if created:
+            added += 1
+            db.log_event(conn, "add", f"bulk: {c.title}", job_id=job_id)
+        entry = {"id": job_id, "created": created, "title": c.title}
+        if can_score:
+            try:
+                s = _do_score(conn, job_id)
+                entry.update(overall=s["overall"], gate_passed=s["gate_passed"])
+                scored_n += 1
+            except Exception:
+                can_score = False  # jd_agent unavailable; stop trying
+        results.append(entry)
+    return {"added": added, "scored": scored_n, "results": results}
+
+
+@app.post("/api/score-all")
+def score_all():
+    """Score every unscored job (heuristic)."""
+    conn = db.connect()
+    ids = db.unscored_job_ids(conn)
+    scored_n, failed = 0, 0
+    for jid in ids:
+        try:
+            _do_score(conn, jid)
+            scored_n += 1
+        except Exception:
+            failed += 1
+    return {"scored": scored_n, "failed": failed, "total": len(ids)}
 
 
 @app.post("/api/jobs/{job_id}/tailor")

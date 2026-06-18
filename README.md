@@ -48,6 +48,10 @@ A single-page dashboard over the whole engine:
   Prep / Outreach / Packet** plus PDF downloads.
 - **Outreach:** drafts a referral-request and a recruiter note from your real facts (networking is the
   biggest hire-rate lever) — you review and send; JobPilot never sends them.
+- **One-click triage:** scan/discover results have **Add all & score**, turning a search into a
+  ranked shortlist instantly; a **Score all** button scores everything unscored at once.
+- **Follow-up reminders:** applications that have gone quiet for 5+ days surface as clickable nudges
+  (a timely follow-up lifts response rates) — JobPilot reminds, you send.
 - **Gap intelligence** banner — the single highest-leverage skill to learn next.
 - Status changes to applied/interview/offer are clearly recorded as *your* action; JobPilot never
   sets them for you.
@@ -83,6 +87,7 @@ Find roles and bulk-triage (resumable, never applies):
 jobpilot scan "machine learning" --add   # pull roles from top companies' public ATS feeds, store them
 jobpilot batch urls.txt          # add + score with a worker pool; prints a ranked shortlist
 jobpilot outreach 1              # draft referral + recruiter messages (you review and send)
+jobpilot followups               # applications that have gone quiet and are due a nudge
 jobpilot gaps                    # the single highest-leverage skill to learn this week
 jobpilot calibrate               # is my scoring predicting real interview/offer outcomes?
 ```

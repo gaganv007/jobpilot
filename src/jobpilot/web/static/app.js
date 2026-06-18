@@ -103,6 +103,32 @@ function renderStats() {
       <span style="color:var(--muted);font-weight:500;font-size:13px">${esc(lead.suggestion)}</span></div></div>`;
   }
   $("#stats").innerHTML = html;
+
+  // action bar: score-all + follow-up reminders
+  const bar = $("#actionbar");
+  let abHtml = "";
+  if (STATE.unscored > 0) {
+    abHtml += `<button class="btn sm primary" id="score-all">⚖ Score all (${STATE.unscored})</button>`;
+  }
+  const fu = STATE.followups || [];
+  if (fu.length) {
+    const items = fu.slice(0, 4).map((f) =>
+      `<span class="fu-item" data-id="${f.job_id}">${esc(f.company || f.title || ("#" + f.job_id))} · ${f.days_since}d</span>`).join("");
+    abHtml += `<div class="fu"><span class="fu-label">⏰ Follow up (${fu.length}):</span> ${items}</div>`;
+  }
+  bar.innerHTML = abHtml;
+  const sa = $("#score-all");
+  if (sa) sa.addEventListener("click", () => scoreAll(sa));
+  $$(".fu-item", bar).forEach((el) => el.addEventListener("click", () => openDrawer(+el.dataset.id)));
+}
+
+async function scoreAll(btn) {
+  const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spin"></span> scoring`;
+  try {
+    const r = await api("/api/score-all", { method: "POST" });
+    toast(r.failed ? `Scored ${r.scored}. ${r.failed} need jd_agent.` : `Scored ${r.scored} job(s). Board re-ranked.`, r.failed > 0);
+    await refresh();
+  } catch (e) { toast(e.message, true); btn.disabled = false; btn.innerHTML = old; }
 }
 
 function renderBoard() {
@@ -384,10 +410,25 @@ async function discoverJobs(btn) {
   finally { btn.disabled = false; btn.innerHTML = old; }
 }
 
+async function bulkAddScore(results, btn) {
+  const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spin"></span> adding`;
+  try {
+    const r = await api("/api/jobs/bulk", { method: "POST", body: JSON.stringify({
+      jobs: results.map((j) => ({ url: j.url, title: j.title, company: j.company, location: j.location, jd_text: j.jd_text })),
+      score: true,
+    }) });
+    toast(`Added ${r.added}, scored ${r.scored}. Ranked on the board below.`);
+    await refresh();
+  } catch (e) { toast(e.message, true); }
+  finally { btn.disabled = false; btn.innerHTML = old; }
+}
+
 function renderCandidates(boxSel, results) {
   const box = $(boxSel);
   if (!results.length) { box.innerHTML = `<p class="empty">No results. Try a different query.</p>`; return; }
-  box.innerHTML = results.map((j, i) => `
+  const header = `<div class="cand-head"><span>${results.length} roles found</span>
+    <button class="btn sm primary" id="bulk-${boxSel.slice(1)}">⚡ Add all &amp; score</button></div>`;
+  box.innerHTML = header + results.map((j, i) => `
     <div class="dres">
       <div>
         <div class="t">${esc(j.title)}</div>
@@ -407,6 +448,8 @@ function renderCandidates(boxSel, results) {
       b.innerHTML = r.created ? "✓ Added" : "Tracked";
     } catch (e) { toast(e.message, true); b.disabled = false; b.innerHTML = "Add"; }
   }));
+  const bulkBtn = $(`#bulk-${boxSel.slice(1)}`, box);
+  if (bulkBtn) bulkBtn.addEventListener("click", () => bulkAddScore(results, bulkBtn));
 }
 
 async function scanJobs(btn) {

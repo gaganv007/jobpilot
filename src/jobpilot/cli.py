@@ -463,6 +463,31 @@ def gaps() -> None:
 
 
 @app.command()
+def followups(days: int = typer.Option(5, "--days", help="Days of silence before a nudge.")) -> None:
+    """List applications that have gone quiet and are due a follow-up."""
+    from . import followups as followups_mod
+
+    conn = db.connect()
+    due = followups_mod.needs_followup(conn, days=days)
+    if not due:
+        console.print("Nothing due a follow-up. Nice and tidy.")
+        return
+    from rich.table import Table
+
+    t = Table(title=f"Due a follow-up (>= {days} days quiet)")
+    t.add_column("#", justify="right")
+    t.add_column("Title")
+    t.add_column("Company")
+    t.add_column("Status")
+    t.add_column("Days", justify="right")
+    for r in due:
+        t.add_row(str(r["job_id"]), (r["title"] or "")[:40], (r["company"] or "")[:24],
+                  r["status"], str(r["days_since"]))
+    console.print(t)
+    console.print("[dim]A short, polite nudge lifts response rates. JobPilot never sends it for you.[/]")
+
+
+@app.command()
 def calibrate() -> None:
     """Report whether my scoring predicts real outcomes; suggest weight tweaks."""
     from . import calibration
