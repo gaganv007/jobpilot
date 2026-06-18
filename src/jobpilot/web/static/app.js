@@ -202,6 +202,12 @@ function renderDrawer(j) {
 
   const human = HUMAN_ONLY.includes(j.status);
 
+  let legitHtml = "";
+  if (j.legitimacy && j.legitimacy.risk && j.legitimacy.risk !== "clear") {
+    const high = j.legitimacy.risk === "high_risk";
+    legitHtml = `<div class="legit ${high ? "high" : "caution"}">${high ? "🚩 High risk" : "⚠️ Caution"} — ${esc(j.legitimacy.summary)}</div>`;
+  }
+
   $("#drawer-body").innerHTML = `
     <div class="d-head">
       <div>
@@ -210,6 +216,7 @@ function renderDrawer(j) {
       </div>
       <button class="x" id="close-x">×</button>
     </div>
+    ${legitHtml}
 
     <div class="d-section">
       <h4>Actions</h4>
@@ -218,6 +225,7 @@ function renderDrawer(j) {
         <button class="btn sm" data-act="tailor">✍ Tailor</button>
         <button class="btn sm" data-act="research">🏢 Research</button>
         <button class="btn sm" data-act="prep">🎤 Prep</button>
+        <button class="btn sm" data-act="outreach">🤝 Outreach</button>
         <button class="btn sm primary" data-act="packet">📄 Packet</button>
         ${docLinks.join("")}
         <button class="btn sm danger" data-act="delete">🗑</button>
@@ -266,7 +274,7 @@ function parseRationale(text) {
 function renderArtTabs(j) {
   const arts = j.artifacts || {};
   const tabs = [
-    ["packet", "Packet"], ["research", "Research"], ["prep", "Prep"],
+    ["packet", "Packet"], ["research", "Research"], ["prep", "Prep"], ["outreach", "Outreach"],
     ["evidence", "Evidence"], ["receipt", "Honesty receipt"], ["tailor_prompt", "Tailor prompt"],
   ].filter(([k]) => arts[k]);
   const tabBar = $("#arttabs");
@@ -297,7 +305,7 @@ async function doAction(act, id, btn) {
     closeDrawer(); toast("Deleted."); refresh();
     return;
   }
-  const labels = { score: "Scoring", tailor: "Tailoring", research: "Researching", prep: "Building prep", packet: "Assembling packet" };
+  const labels = { score: "Scoring", tailor: "Tailoring", research: "Researching", prep: "Building prep", packet: "Assembling packet", outreach: "Drafting outreach" };
   const old = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = `<span class="spin"></span>`;
   try {
@@ -371,13 +379,13 @@ async function discoverJobs(btn) {
   const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spin"></span> searching`;
   try {
     const r = await api("/api/discover", { method: "POST", body: JSON.stringify({ query, sources, limit: 25 }) });
-    renderDiscover(r.results || []);
+    renderCandidates("#d-results", r.results || []);
   } catch (e) { toast(e.message, true); }
   finally { btn.disabled = false; btn.innerHTML = old; }
 }
 
-function renderDiscover(results) {
-  const box = $("#d-results");
+function renderCandidates(boxSel, results) {
+  const box = $(boxSel);
   if (!results.length) { box.innerHTML = `<p class="empty">No results. Try a different query.</p>`; return; }
   box.innerHTML = results.map((j, i) => `
     <div class="dres">
@@ -401,6 +409,24 @@ function renderDiscover(results) {
   }));
 }
 
+async function scanJobs(btn) {
+  const query = $("#s-query").value.trim();
+  const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spin"></span> scanning`;
+  try {
+    const r = await api("/api/scan", { method: "POST", body: JSON.stringify({ query, limit: 50 }) });
+    renderCandidates("#s-results", r.results || []);
+    if ((r.results || []).length) toast(`Found ${r.results.length} roles across top companies.`);
+  } catch (e) { toast(e.message, true); }
+  finally { btn.disabled = false; btn.innerHTML = old; }
+}
+
+async function loadScanTargets() {
+  try {
+    const r = await api("/api/scan/targets");
+    $("#s-targets").innerHTML = (r.targets || []).map((t) => `<span class="chip have">${esc(t[2])}</span>`).join("");
+  } catch (_) {}
+}
+
 // ---------- wire up ----------
 function init() {
   $$(".tab").forEach((t) => t.addEventListener("click", () => {
@@ -412,6 +438,8 @@ function init() {
   $("#p-add").addEventListener("click", addPaste);
   $("#u-add").addEventListener("click", (e) => addUrl(e.target));
   $("#d-search").addEventListener("click", (e) => discoverJobs(e.target.closest("button")));
+  $("#s-search").addEventListener("click", (e) => scanJobs(e.target.closest("button")));
+  loadScanTargets();
   $("#overlay").addEventListener("click", closeDrawer);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
 

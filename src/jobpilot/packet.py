@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 
-from . import db, prep, profile, research, scoring
+from . import db, legitimacy, prep, profile, research, scoring
 
 
 def build_packet(conn, job_id: int) -> str:
@@ -48,6 +48,11 @@ def build_packet(conn, job_id: int) -> str:
                       "```", sc["rationale"], "```", "</details>"]
     else:
         lines.append("_Not scored yet — run `jobpilot score " + str(job_id) + "`._")
+
+    legit = legitimacy.assess(job.get("jd_text", ""), company=job.get("company", ""), title=job.get("title", ""))
+    if legit["risk"] != "clear":
+        icon = "🚩" if legit["risk"] == "high_risk" else "⚠️"
+        lines += ["", f"## {icon} Legitimacy", f"> {legit['summary']}"]
 
     lines += ["", "## Tailored documents"]
     if appn and appn["resume_path"]:

@@ -21,9 +21,12 @@ from .. import (
     db,
     discover,
     gaps as gaps_mod,
+    legitimacy,
+    outreach as outreach_mod,
     packet as packet_mod,
     prep as prep_mod,
     research as research_mod,
+    scan as scan_mod,
     scoring,
     tailor as tailor_mod,
 )
@@ -51,6 +54,12 @@ class DiscoverReq(BaseModel):
     query: str = ""
     sources: list[str] | None = None
     limit: int = 25
+
+
+class ScanReq(BaseModel):
+    query: str = ""
+    targets: list[list[str]] | None = None  # [[ats, token, label], ...]
+    limit: int = 60
 
 
 class TailorReq(BaseModel):
@@ -187,6 +196,18 @@ def discover_jobs(body: DiscoverReq):
     return {"results": discover.discover(body.query, body.sources, body.limit)}
 
 
+@app.get("/api/scan/targets")
+def scan_targets():
+    return {"targets": [list(t) for t in scan_mod.TARGETS]}
+
+
+@app.post("/api/scan")
+def scan_jobs(body: ScanReq):
+    # Public ATS feeds (Greenhouse/Lever/Ashby), user-triggered, review-only.
+    targets = [tuple(t) for t in body.targets] if body.targets else None
+    return {"results": scan_mod.scan(targets, query=body.query, total_limit=body.limit)}
+
+
 # ---------- per-job ----------
 @app.get("/api/jobs/{job_id}")
 def job_detail(job_id: int):
@@ -205,6 +226,7 @@ def job_detail(job_id: int):
         view["scored_at"] = sc["scored_at"]
     view["jd_text"] = job["jd_text"]
     view["ats"] = _ats(job["jd_text"])
+    view["legitimacy"] = legitimacy.assess(job["jd_text"], company=job["company"], title=job["title"])
     view["weights"] = scoring.WEIGHTS
     view["gates"] = list(scoring.GATES)
     d = config.job_dir(job_id)
@@ -214,6 +236,7 @@ def job_detail(job_id: int):
         "research": _read_if(d / "research.md"),
         "prep": _read_if(d / "prep.md"),
         "packet": _read_if(d / "packet.md"),
+        "outreach": _read_if(d / "outreach.md"),
         "tailor_prompt": _read_if(d / "tailor_prompt.txt"),
     }
     view["files"] = [p.name for p in sorted(d.glob("*")) if p.is_file()]
@@ -289,6 +312,22 @@ def prep_job(job_id: int):
     (config.job_dir(job_id) / "prep.md").write_text(doc, encoding="utf-8")
     db.log_event(conn, "prep", "web", job_id=job_id)
     return {"markdown": doc}
+
+
+@app.post("/api/jobs/{job_id}/outreach")
+def outreach_job(job_id: int):
+    conn = db.connect()
+    job = db.get_job(conn, job_id)
+    if job is None:
+        raise HTTPException(404, "No such job")
+    msgs = outreach_mod.build_outreach(dict(job))
+    doc = (f"# Outreach — {job['title']} @ {job['company']}\n\n"
+           f"_Review and personalize before sending. JobPilot never sends these for you._\n\n"
+           f"## Referral request (to an employee)\n\n{msgs['referral']}\n\n"
+           f"## Recruiter / hiring manager note\n\n{msgs['recruiter']}\n")
+    (config.job_dir(job_id) / "outreach.md").write_text(doc, encoding="utf-8")
+    db.log_event(conn, "outreach", "web", job_id=job_id)
+    return {"markdown": doc, **msgs}
 
 
 @app.post("/api/jobs/{job_id}/packet")

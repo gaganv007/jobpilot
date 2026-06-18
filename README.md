@@ -38,11 +38,16 @@ jobpilot serve                   # then open http://127.0.0.1:8000
 A single-page dashboard over the whole engine:
 
 - **Kanban pipeline** by status with live fit-score pills (strong / solid / FAIL / unscored).
-- **Add jobs three ways:** paste a JD, fetch one URL (robots-respected), or **Discover** —
-  opt-in search of public job APIs (Remotive, Arbeitnow), no scraping, results you review and add.
+- **Add jobs four ways:** paste a JD, fetch one URL (robots-respected), **Discover** (public job
+  APIs: Remotive, Arbeitnow), or **Scan top companies** — pull open roles straight from 15+ top
+  companies' official public ATS feeds (Greenhouse, Lever, Ashby). All opt-in, review-only, no scraping.
+- **Legitimacy gate:** every job is checked for scam and ghost-job signals; high-risk postings get a
+  red banner so you never waste an application on them.
 - **Per-job drawer:** the gated score with per-dimension bars (gates highlighted), an **ATS keyword
   match ring** with the exact missing keywords to close, and one-click **Score / Tailor / Research /
-  Prep / Packet** plus PDF downloads.
+  Prep / Outreach / Packet** plus PDF downloads.
+- **Outreach:** drafts a referral-request and a recruiter note from your real facts (networking is the
+  biggest hire-rate lever) — you review and send; JobPilot never sends them.
 - **Gap intelligence** banner — the single highest-leverage skill to learn next.
 - Status changes to applied/interview/offer are clearly recorded as *your* action; JobPilot never
   sets them for you.
@@ -72,10 +77,12 @@ jobpilot status 1 applied --note "referred by X"     # you update the pipeline (
 jobpilot board                                       # dashboard + skill-to-learn-next
 ```
 
-Bulk triage a list of URLs (resumable, never applies):
+Find roles and bulk-triage (resumable, never applies):
 
 ```bash
+jobpilot scan "machine learning" --add   # pull roles from top companies' public ATS feeds, store them
 jobpilot batch urls.txt          # add + score with a worker pool; prints a ranked shortlist
+jobpilot outreach 1              # draft referral + recruiter messages (you review and send)
 jobpilot gaps                    # the single highest-leverage skill to learn this week
 jobpilot calibrate               # is my scoring predicting real interview/offer outcomes?
 ```

@@ -394,6 +394,64 @@ def batch(
 
 
 @app.command()
+def scan(
+    query: str = typer.Argument("", help="Filter scanned roles by keywords."),
+    add: bool = typer.Option(False, "--add", help="Store the matching jobs (does not score/apply)."),
+    limit: int = typer.Option(40, "--limit", help="Max roles to return."),
+) -> None:
+    """Scan top companies' public ATS feeds (Greenhouse/Lever/Ashby) for roles."""
+    from . import scan as scan_mod
+
+    console.print(f"[dim]Scanning {len(scan_mod.TARGETS)} companies' public ATS feeds…[/]")
+    results = scan_mod.scan(query=query, total_limit=limit)
+    if not results:
+        console.print("No matching roles found.")
+        return
+    from rich.table import Table
+
+    t = Table(title=f"Scan results ({len(results)})")
+    t.add_column("Title")
+    t.add_column("Company")
+    t.add_column("Location")
+    t.add_column("Source")
+    for r in results:
+        t.add_row((r["title"] or "")[:42], (r["company"] or "")[:20],
+                  (r["location"] or "")[:24], r["source"])
+    console.print(t)
+
+    if add:
+        conn = db.connect()
+        n = 0
+        for r in results:
+            _id, created = db.add_job(conn, r["url"], company=r["company"], title=r["title"],
+                                      location=r["location"], source=r["source"], jd_text=r["jd_text"])
+            if created:
+                db.log_event(conn, "add", f"scan: {r['title']}", job_id=_id)
+                n += 1
+        console.print(f"[green]Added {n} new job(s).[/] Next: jobpilot score --all-unscored")
+    else:
+        console.print("[dim]Re-run with --add to store these. JobPilot never applies for you.[/]")
+
+
+@app.command()
+def outreach(job_id: int = typer.Argument(..., help="Job id to draft outreach for.")) -> None:
+    """Draft referral + recruiter outreach messages (you review and send)."""
+    from . import config, outreach as outreach_mod
+
+    conn = db.connect()
+    job = _require_job(conn, job_id)
+    msgs = outreach_mod.build_outreach(job)
+    doc = (f"# Outreach — {job['title']} @ {job['company']}\n\n"
+           f"## Referral request\n\n{msgs['referral']}\n\n## Recruiter note\n\n{msgs['recruiter']}\n")
+    (config.job_dir(job_id) / "outreach.md").write_text(doc, encoding="utf-8")
+    db.log_event(conn, "outreach", "cli", job_id=job_id)
+    from rich.markdown import Markdown
+
+    console.print(Markdown(doc))
+    console.print("[dim]Review and personalize before sending. JobPilot never sends these.[/]")
+
+
+@app.command()
 def gaps() -> None:
     """Aggregate skill gaps across scored jobs; name the best skill to learn next."""
     from . import gaps as gaps_mod

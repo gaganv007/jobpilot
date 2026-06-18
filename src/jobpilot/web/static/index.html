@@ -28,6 +28,7 @@
       <button class="tab active" data-tab="paste">Paste JD</button>
       <button class="tab" data-tab="url">Fetch URL</button>
       <button class="tab" data-tab="discover">Discover jobs</button>
+      <button class="tab" data-tab="scan">Scan top companies</button>
     </div>
 
     <div class="tabpane active" data-pane="paste">
@@ -59,6 +60,16 @@
       </div>
       <p class="hint">Opt-in discovery via public job APIs (no scraping). Results are for you to review and add.</p>
       <div id="d-results" class="discover-results"></div>
+    </div>
+
+    <div class="tabpane" data-pane="scan">
+      <div class="row">
+        <input id="s-query" placeholder="Filter roles e.g. machine learning, data…" />
+        <button class="btn primary" id="s-search">Scan companies</button>
+      </div>
+      <p class="hint">Pulls open roles from top companies' official public ATS feeds (Greenhouse, Lever, Ashby). User-triggered, review-only.</p>
+      <div id="s-targets" class="chips" style="margin-top:8px"></div>
+      <div id="s-results" class="discover-results"></div>
     </div>
   </section>
 

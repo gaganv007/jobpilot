@@ -143,6 +143,10 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 .d-head .sub { color: var(--muted); font-size: 13px; }
 .x { background: transparent; border: none; color: var(--muted); font-size: 22px; cursor: pointer; line-height: 1; }
 
+.legit { margin-top: 14px; padding: 10px 13px; border-radius: 9px; font-size: 13px; line-height: 1.4; }
+.legit.caution { background: rgba(255,159,67,.1); border: 1px solid rgba(255,159,67,.4); color: var(--warn); }
+.legit.high { background: rgba(234,84,85,.1); border: 1px solid rgba(234,84,85,.45); color: #ff8b8b; }
+
 .d-section { margin-top: 22px; }
 .d-section h4 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
 
