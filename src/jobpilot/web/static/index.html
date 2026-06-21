@@ -52,13 +52,31 @@
     </div>
 
     <div class="tabpane" data-pane="search">
+      <div id="adz-banner" class="adz-banner" style="display:none">
+        <div>
+          <b>Unlock the full job search.</b> Add a free Adzuna API key (2-min signup, no cost) to search
+          real full-time roles across the web by keyword + location. Get one at
+          <a href="https://developer.adzuna.com/signup" target="_blank" rel="noopener">developer.adzuna.com</a>,
+          then paste your App ID and App Key below. Without it, search still covers 30+ top companies.
+        </div>
+        <div class="row" style="margin-top:8px">
+          <input id="adz-id" placeholder="Adzuna App ID" />
+          <input id="adz-key" placeholder="Adzuna App Key" />
+          <button class="btn sm primary" id="adz-save">Save key</button>
+        </div>
+      </div>
+
       <div class="row">
         <input id="x-query" placeholder="Role e.g. machine learning, data scientist, software engineer" />
         <input id="x-location" placeholder="Location (optional) e.g. Boston, Remote" style="max-width:240px" />
-        <label class="chk"><input type="checkbox" id="x-senior" /> Include senior</label>
         <button class="btn primary" id="x-search">Search jobs</button>
       </div>
-      <p class="hint">Searches 30+ top companies' official job feeds plus public boards, ranked by fit to your resumes. Senior/off-track roles hidden by default. Every result has a real apply link. JobPilot never applies for you.</p>
+      <div class="row" style="margin-top:8px">
+        <label class="chk"><input type="checkbox" id="x-senior" /> Include senior</label>
+        <label class="chk"><input type="checkbox" id="x-intern" /> Include internships</label>
+        <label class="chk"><input type="checkbox" id="x-phd" /> Include PhD-required</label>
+      </div>
+      <p class="hint">Tuned for full-time early-career roles, ranked by fit to your resumes. Senior, internship, PhD-required and off-track roles are hidden by default. Every result has a real apply link. JobPilot never applies for you.</p>
       <div id="x-results" class="discover-results"></div>
     </div>
   </section>

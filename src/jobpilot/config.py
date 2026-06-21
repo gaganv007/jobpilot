@@ -45,6 +45,42 @@ def job_dir(job_id: int) -> Path:
     return p
 
 
+def settings_path() -> Path:
+    return home_dir() / "settings.json"
+
+
+def get_settings() -> dict:
+    """Local user settings (e.g. Adzuna API creds). Stored in JOBPILOT_HOME."""
+    import json
+
+    p = settings_path()
+    if p.exists():
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+
+def save_settings(updates: dict) -> dict:
+    import json
+
+    s = get_settings()
+    s.update({k: v for k, v in updates.items() if v is not None})
+    settings_path().write_text(json.dumps(s, indent=2), encoding="utf-8")
+    return s
+
+
+def adzuna_creds() -> tuple[str, str] | None:
+    """(app_id, app_key) from settings or env, or None if not configured."""
+    s = get_settings()
+    app_id = s.get("adzuna_app_id") or os.environ.get("ADZUNA_APP_ID")
+    app_key = s.get("adzuna_app_key") or os.environ.get("ADZUNA_APP_KEY")
+    if app_id and app_key:
+        return app_id, app_key
+    return None
+
+
 def jd_agent_dir() -> Path:
     """Location of the existing jd_agent project we reuse (core.py, resumes/)."""
     return Path(

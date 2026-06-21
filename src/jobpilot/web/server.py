@@ -69,9 +69,16 @@ class SearchReq(BaseModel):
     query: str = ""
     location: str = ""
     include_senior: bool = False
+    include_intern: bool = False
+    include_phd: bool = False
     limit: int = 50
     companies: bool = True   # include top-company ATS feeds
-    boards: bool = True      # include public job boards (Muse/Remotive/Arbeitnow)
+    boards: bool = True      # include public boards / Adzuna
+
+
+class SettingsReq(BaseModel):
+    adzuna_app_id: str | None = None
+    adzuna_app_key: str | None = None
 
 
 class Candidate(BaseModel):
@@ -270,8 +277,39 @@ def unified_search(body: SearchReq):
         seen_key.add(key)
         merged.append(r)
 
-    ranked = relevance.rank(merged, include_senior=body.include_senior)
-    return {"results": ranked[: body.limit], "total_found": len(merged)}
+    ranked = relevance.rank(
+        merged,
+        include_senior=body.include_senior,
+        include_intern=body.include_intern,
+        include_phd=body.include_phd,
+    )
+    return {
+        "results": ranked[: body.limit],
+        "total_found": len(merged),
+        "adzuna": config.adzuna_creds() is not None,
+    }
+
+
+@app.get("/api/settings")
+def get_settings():
+    return {"adzuna": config.adzuna_creds() is not None}
+
+
+@app.post("/api/settings")
+def save_settings(body: SettingsReq):
+    config.save_settings({
+        "adzuna_app_id": (body.adzuna_app_id or "").strip() or None,
+        "adzuna_app_key": (body.adzuna_app_key or "").strip() or None,
+    })
+    ok = config.adzuna_creds() is not None
+    # Verify the key actually works with a tiny query.
+    works = False
+    if ok:
+        try:
+            works = bool(discover.search_adzuna("software engineer", limit=1))
+        except Exception:
+            works = False
+    return {"adzuna": ok, "verified": works}
 
 
 @app.get("/api/scan/targets")

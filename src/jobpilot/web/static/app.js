@@ -462,6 +462,24 @@ function renderCandidates(boxSel, results, totalFound) {
   if (bulkBtn) bulkBtn.addEventListener("click", () => bulkAddScore(results, bulkBtn));
 }
 
+function updateAdzBanner(configured) {
+  const b = $("#adz-banner");
+  if (b) b.style.display = configured ? "none" : "block";
+}
+
+async function saveAdzunaKey(btn) {
+  const id = $("#adz-id").value.trim(), key = $("#adz-key").value.trim();
+  if (!id || !key) return toast("Enter both App ID and App Key.", true);
+  const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spin"></span> verifying`;
+  try {
+    const r = await api("/api/settings", { method: "POST", body: JSON.stringify({ adzuna_app_id: id, adzuna_app_key: key }) });
+    if (r.verified) { toast("Adzuna connected — full search unlocked."); updateAdzBanner(true); }
+    else if (r.adzuna) toast("Saved, but the key didn't return results. Double-check it.", true);
+    else toast("Could not save key.", true);
+  } catch (e) { toast(e.message, true); }
+  finally { btn.disabled = false; btn.innerHTML = old; }
+}
+
 async function searchJobs(btn) {
   const query = $("#x-query").value.trim();
   const location = $("#x-location").value.trim();
@@ -469,10 +487,16 @@ async function searchJobs(btn) {
   $("#x-results").innerHTML = `<p class="empty">Searching top companies and job boards…</p>`;
   try {
     const r = await api("/api/search", { method: "POST", body: JSON.stringify({
-      query, location, include_senior: $("#x-senior").checked, limit: 60,
+      query, location,
+      include_senior: $("#x-senior").checked,
+      include_intern: $("#x-intern").checked,
+      include_phd: $("#x-phd").checked,
+      limit: 60,
     }) });
     renderCandidates("#x-results", r.results || [], r.total_found);
+    updateAdzBanner(r.adzuna);
     if ((r.results || []).length) toast(`${r.results.length} best-fit roles (of ${r.total_found} found).`);
+    else if (!r.adzuna) toast("Add a free Adzuna key (banner above) for full job search.", true);
   } catch (e) { toast(e.message, true); $("#x-results").innerHTML = `<p class="empty">${esc(e.message)}</p>`; }
   finally { btn.disabled = false; btn.innerHTML = old; }
 }
@@ -489,6 +513,8 @@ function init() {
   $("#u-add").addEventListener("click", (e) => addUrl(e.target));
   $("#x-search").addEventListener("click", (e) => searchJobs(e.target.closest("button")));
   $("#x-query").addEventListener("keydown", (e) => { if (e.key === "Enter") searchJobs($("#x-search")); });
+  $("#adz-save").addEventListener("click", (e) => saveAdzunaKey(e.target.closest("button")));
+  api("/api/settings").then((s) => updateAdzBanner(s.adzuna)).catch(() => {});
   $("#overlay").addEventListener("click", closeDrawer);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
 

@@ -166,12 +166,62 @@ def _keyword_filter(items: list[dict], query: str) -> list[dict]:
     return out
 
 
+def search_adzuna(query: str, location: str = "", limit: int = 50,
+                  exclude: str = "senior staff principal lead director intern internship") -> list[dict]:
+    """Adzuna aggregator (pulls Indeed and others). Real keyword + location
+    search with apply links. Needs a free API key (config.adzuna_creds()).
+
+    https://developer.adzuna.com — free signup, generous limits.
+    """
+    from . import config
+
+    creds = config.adzuna_creds()
+    if not creds:
+        return []
+    app_id, app_key = creds
+    url = "https://api.adzuna.com/v1/api/jobs/us/search/1"
+    params = {
+        "app_id": app_id, "app_key": app_key,
+        "results_per_page": str(min(limit, 50)),
+        "what": query or "software engineer",
+        "max_days_old": "30",
+        "content-type": "application/json",
+    }
+    if location:
+        params["where"] = location
+    if exclude:
+        params["what_exclude"] = exclude
+    out: list[dict] = []
+    try:
+        r = httpx.get(url, params=params, headers=HEADERS, timeout=TIMEOUT)
+        r.raise_for_status()
+        for j in r.json().get("results", []):
+            link = j.get("redirect_url", "")
+            loc = (j.get("location") or {}).get("display_name", "")
+            out.append({
+                "url": link,
+                "company": (j.get("company") or {}).get("display_name", ""),
+                "title": j.get("title", ""),
+                "location": loc,
+                "source": "adzuna",
+                "jd_text": _clean(j.get("description", "")),
+                "remote": "remote" in (loc or "").lower(),
+                "apply_url": link,
+            })
+    except Exception:
+        pass
+    return out
+
+
 SOURCES = {
+    "adzuna": lambda q, limit=50, location="": search_adzuna(q, location, limit),
     "remotive": lambda q, limit=25, location="": search_remotive(q, limit),
     "arbeitnow": lambda q, limit=25, location="": search_arbeitnow(q, limit),
     "themuse": lambda q, limit=25, location="": search_themuse(q, location, pages=1),
 }
-DEFAULT_SOURCES = ["themuse", "remotive", "arbeitnow"]
+# The Muse is excluded by default (its categorization is unreliable). Adzuna is
+# the primary source when configured; remote boards supplement it.
+DEFAULT_SOURCES = ["adzuna", "remotive", "arbeitnow"]
 
 
 def search(

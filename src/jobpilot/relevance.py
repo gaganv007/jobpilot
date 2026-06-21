@@ -22,6 +22,10 @@ SENIOR_RE = re.compile(
     r"director|vp|vice\s+president|head\s+of|chief|architect|"
     r"manager|mgr|\biii\b|\biv\b|10\+\s*years|8\+\s*years)\b", re.I)
 
+# Internships / PhD-required roles — excluded by default for a full-time MS grad.
+INTERN_RE = re.compile(r"\b(intern|internship|co[\s-]?op|apprentice|trainee|summer\s+\d{4})\b", re.I)
+PHD_RE = re.compile(r"\b(ph\.?d|doctoral|doctorate)\b", re.I)
+
 # Role families I do NOT target (I am engineering/ML/data, not sales/PM/etc.).
 OFFTRACK_RE = re.compile(
     r"\b(sales|account\s+executive|alliance|partnership|business\s+development|"
@@ -81,15 +85,21 @@ def _fit_fallback(text: str):
 
 
 def annotate(candidate: dict) -> dict:
-    """Add fit, track, seniority, off_track, relevant to a candidate (in place)."""
-    text = f"{candidate.get('title','')} {candidate.get('title','')} {candidate.get('jd_text','')}"
+    """Add fit, track, seniority, off_track, intern/phd, relevant (in place)."""
+    title = candidate.get("title", "")
+    jd = candidate.get("jd_text", "")
+    text = f"{title} {title} {jd}"
     res = _fit_with_engine(text) or _fit_fallback(text)
     fit, track, coverage, weight = res
     candidate["fit"] = int(fit)
     candidate["track"] = track
-    candidate["seniority"] = detect_seniority(candidate.get("title", ""))
-    candidate["off_track"] = bool(OFFTRACK_RE.search(candidate.get("title", "")))
-    # "relevant" = an engineering/ML/data role with a real keyword signal
+    candidate["seniority"] = detect_seniority(title)
+    candidate["off_track"] = bool(OFFTRACK_RE.search(title))
+    candidate["intern"] = bool(INTERN_RE.search(title))
+    # PhD-required: title says PhD, or the JD *requires* one ("MS or PhD" stays ok).
+    candidate["phd_required"] = bool(PHD_RE.search(title)) or bool(
+        re.search(r"(requires?|must have|minimum).{0,30}\bph\.?d\b", jd, re.I)
+    )
     candidate["relevant"] = (not candidate["off_track"]) and (weight >= 3 or fit >= 35)
     return candidate
 
@@ -111,13 +121,15 @@ def quick_fit(title: str, jd_text: str) -> dict:
 def rank(
     candidates: list[dict],
     include_senior: bool = False,
+    include_intern: bool = False,
+    include_phd: bool = False,
     only_relevant: bool = True,
 ) -> list[dict]:
     """Annotate, filter, and sort candidates best-fit first.
 
-    By default drops senior and off-track (sales/PM/etc.) roles and anything
-    with no real fit, then sorts by fit. Pass include_senior=True to keep senior
-    roles (they sort below entry/mid of equal fit)."""
+    Defaults tuned for a full-time MS new grad: drops senior, off-track
+    (sales/PM/etc.), internships, and PhD-required roles, plus anything with no
+    real fit. Toggle the include_* flags to widen."""
     annotated = [annotate(dict(c)) for c in candidates]
     kept = []
     for c in annotated:
@@ -126,6 +138,10 @@ def rank(
         if only_relevant and not c["relevant"]:
             continue
         if not include_senior and c["seniority"] == "senior":
+            continue
+        if not include_intern and c.get("intern"):
+            continue
+        if not include_phd and c.get("phd_required"):
             continue
         kept.append(c)
 

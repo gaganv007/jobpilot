@@ -103,6 +103,13 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 .btn.sm { padding: 6px 11px; font-size: 12.5px; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 
+.adz-banner {
+  background: linear-gradient(135deg, rgba(79,140,255,.1), rgba(124,92,255,.1));
+  border: 1px solid rgba(79,140,255,.4); border-radius: 10px; padding: 12px 14px;
+  margin-bottom: 12px; font-size: 13px; line-height: 1.5;
+}
+.adz-banner a { color: var(--accent); }
+
 /* discover results */
 .discover-results { margin-top: 12px; display: grid; gap: 8px; max-height: 360px; overflow: auto; }
 .dres {

@@ -38,10 +38,14 @@ jobpilot serve                   # then open http://127.0.0.1:8000
 A single-page dashboard over the whole engine:
 
 - **Kanban pipeline** by status with live fit-score pills (strong / solid / FAIL / unscored).
-- **One powerful search:** the **🔎 Search jobs** tab queries 30+ top companies' official job feeds
-  (Greenhouse, Lever, Ashby) **and** public boards (The Muse, Remotive, Arbeitnow) in parallel, merges
-  and de-dupes them, and ranks everything by fit to your resumes — senior/off-track roles hidden by
-  default, a real **Apply** link on every result. Optional location filter. Opt-in, review-only, no scraping.
+- **One powerful search:** the **🔎 Search jobs** tab is tuned for **full-time early-career** roles.
+  It queries 30+ top companies' official feeds (Greenhouse, Lever, Ashby) plus, when you add a free
+  **Adzuna** API key, the whole web (Indeed and more) by keyword + location. Results are ranked by fit
+  to your resumes, with **senior, internship, PhD-required and off-track roles hidden by default**
+  (toggleable), and a real **Apply** link on every one.
+  - **Unlock full search:** get a free key at [developer.adzuna.com](https://developer.adzuna.com/signup)
+    (2-min signup, no cost) and paste the App ID + App Key into the banner in the Search tab. Without
+    it, search still covers 30+ top companies.
 - Also add jobs by pasting a JD or fetching a single URL (robots-respected).
 - **Legitimacy gate:** every job is checked for scam and ghost-job signals; high-risk postings get a
   red banner so you never waste an application on them.
