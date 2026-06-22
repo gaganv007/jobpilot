@@ -29,7 +29,19 @@ pip install -e ".[dev]"
 playwright install chromium      # for live JD extraction (jobpilot add / Fetch URL)
 ```
 
-## Web app (recommended)
+## Quickest start: one command
+
+No server, no setup. Searches top companies, ranks by fit to your resumes, and
+opens a clean page of **full-time** jobs with an Apply button on each:
+
+```bash
+jobpilot find "machine learning"
+jobpilot find "data scientist" --location Boston
+```
+
+It writes `~/Desktop/jobpilot_matches.html` and opens it. You click Apply — JobPilot never applies for you.
+
+## Web app
 
 ```bash
 jobpilot serve                   # then open http://127.0.0.1:8000

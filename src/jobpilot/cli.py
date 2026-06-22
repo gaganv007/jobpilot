@@ -602,6 +602,37 @@ def board() -> None:
 
 
 @app.command()
+def find(
+    query: str = typer.Argument(..., help='Role to search, e.g. "machine learning".'),
+    location: str = typer.Option("", "--location", "-l", help="City or 'remote' (optional)."),
+    limit: int = typer.Option(30, "--limit", help="Max jobs to show."),
+    include_senior: bool = typer.Option(False, "--senior", help="Include senior roles."),
+    open_browser: bool = typer.Option(True, "--open/--no-open", help="Open the page in your browser."),
+) -> None:
+    """Find full-time, resume-matched jobs and open them as a simple page.
+
+    One command, no server: searches top companies (+ Adzuna if a key is set),
+    ranks by fit to your resumes, and opens a page with an Apply link per job.
+    """
+    from . import find as find_mod
+
+    with console.status(f'Searching for "{query}"…'):
+        out, shown, total = find_mod.find(query, location, limit, include_senior)
+
+    if shown == 0:
+        console.print(f"[yellow]No full-time matches[/] for '{query}'"
+                      + (f" near {location}" if location else "") + ".")
+        console.print("[dim]Try a broader keyword, add --senior, or set an Adzuna key for full web search.[/]")
+    else:
+        console.print(f"[green]{shown} full-time matches[/] (of {total} found) → {out}")
+
+    if open_browser:
+        import webbrowser
+
+        webbrowser.open(out.as_uri())
+
+
+@app.command()
 def serve(
     host: str = typer.Option("127.0.0.1", help="Bind host."),
     port: int = typer.Option(8000, help="Bind port."),
